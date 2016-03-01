@@ -64,7 +64,7 @@ class Add extends DashboardPageController {
 
 		if (strlen($username) >= Config::get('concrete.user.username.minimum') && !$valc->username($username)) {
 			if(Config::get('concrete.user.username.allow_spaces')) {
-				$this->error->add(t('A username may only contain letters, numbers, spaces, dots (not at the beginning/end), underscores (not at the beginning/end).'));
+				$this->error->add(t('A username may only contain letters, numbers, spaces (not at the beginning/end), dots (not at the beginning/end), underscores (not at the beginning/end).'));
 			} else {
 				$this->error->add(t('A username may only contain letters numbers, dots (not at the beginning/end), underscores (not at the beginning/end).'));
 			}
@@ -78,14 +78,7 @@ class Add extends DashboardPageController {
 			$this->error->add(t('Invalid Username'));
 		}
 
-
-		if ((strlen($password) < Config::get('concrete.user.password.minimum')) || (strlen($password) >  Config::get('concrete.user.password.maximum'))) {
-			$this->error->add(t('A password must be between %s and %s characters',Config::get('concrete.user.password.minimum'), Config::get('concrete.user.password.maximum')));
-		}
-
-		if (strlen($password) >= Config::get('concrete.user.password.minimum') && !$valc->password($password)) {
-			$this->error->add(t('A password may not contain ", \', >, <, or any spaces.'));
-		}
+		\Core::make('validator/password')->isValid($password, $this->error);
 
 		if (!$valt->validate('submit')) {
 			$this->error->add($valt->getErrorMessage());

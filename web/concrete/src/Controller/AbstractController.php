@@ -2,12 +2,14 @@
 
 namespace Concrete\Core\Controller;
 
+use Concrete\Core\Application\Application;
+use Concrete\Core\Application\ApplicationAwareInterface;
 use Concrete\Core\Http\ResponseAssetGroup;
 use Core;
 use Request;
 use View;
 
-abstract class AbstractController
+abstract class AbstractController implements ApplicationAwareInterface
 {
 
     protected $helpers = array();
@@ -15,6 +17,9 @@ abstract class AbstractController
     protected $action;
     protected $request;
     protected $parameters;
+
+    /** @var Application */
+    protected $app;
 
     public function __construct()
     {
@@ -129,9 +134,9 @@ abstract class AbstractController
         return Request::isPost();
     }
 
-    public function post($key = null)
+    public function post($key = null, $defaultValue = null)
     {
-        return Request::post($key);
+        return Request::post($key, $defaultValue);
     }
 
     public function redirect()
@@ -161,6 +166,16 @@ abstract class AbstractController
     public function request($key = null)
     {
         return Request::request($key);
+    }
+
+    /**
+     * Set the application object
+     *
+     * @param \Concrete\Core\Application\Application $application
+     */
+    public function setApplication(Application $application)
+    {
+        $this->app = $application;
     }
 
 }

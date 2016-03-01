@@ -12,12 +12,10 @@ use PermissionKey;
 
 class Sitemap
 {
-
-
     /**
      * @var bool
      */
-    protected $autoOpenNodes = true;
+    protected $expandedNodes = array();
     /**
      * @var bool
      */
@@ -30,9 +28,9 @@ class Sitemap
     /**
      * @param bool $autoOpen
      */
-    public function setAutoOpenNodes($autoOpen)
+    public function setExpandedNodes($nodes)
     {
-        $this->autoOpenNodes = $autoOpen;
+        $this->expandedNodes = $nodes;
     }
 
     /**
@@ -43,6 +41,7 @@ class Sitemap
         if (!isset($this->includeSystemPages)) {
             $this->includeSystemPages = Cookie::get('includeSystemPages');
         }
+
         return $this->includeSystemPages;
     }
 
@@ -65,13 +64,15 @@ class Sitemap
 
     /**
      * @param int $cID
+     *
      * @return array
      */
-    public function getSubNodes($cID)
+    public function getSubNodes($cID, $onGetNode = null)
     {
         $pl = new PageList();
-        $pl->setPermissionsChecker(function($page) {
+        $pl->setPermissionsChecker(function ($page) {
             $cp = new \Permissions($page);
+
             return $cp->canViewPageInSitemap();
         });
         $pl->includeAliases();
@@ -85,6 +86,7 @@ class Sitemap
 
         if ($cID == 1) {
             $results = $pl->getResults();
+            $pagination = null;
         } else {
             $pl->setItemsPerPage(Config::get('concrete.limits.sitemap_pages'));
             $pagination = $pl->getPagination();
@@ -94,43 +96,45 @@ class Sitemap
 
         $nodes = array();
         foreach ($results as $c) {
-            $n = $this->getNode($c);
+            $n = $this->getNode($c, true, $onGetNode);
             if ($n != false) {
                 $nodes[] = $n;
             }
         }
         if (is_object($pagination) && $pagination->getNbPages() > 1) {
             if ($this->displayNodePagination && isset($pagination)) {
-                $n = new stdClass;
+                $n = new stdClass();
                 $n->icon = false;
                 $n->addClass = 'ccm-sitemap-explore';
                 $n->noLink = true;
                 $n->unselectable = true;
-                $html = $pagination->renderDefaultView();
+                $html = $pagination->renderView('dashboard');
                 $n->title = $html;
                 $nodes[] = $n;
             } else {
-                $n = new stdClass;
-                $n->icon =false;
+                $n = new stdClass();
+                $n->icon = false;
                 $n->addClass = 'ccm-sitemap-explore';
                 $n->noLink = true;
                 $n->active = false;
                 $n->focus = false;
                 $n->unselectable = true;
                 $n->title = ' ' . t('%s more to display. <strong>View all &gt;</strong>', $total - Config::get('concrete.limits.sitemap_pages'));
-                $n->href = \URL::to('/dashboard/sitemap/explore/', $cID);
+                $n->href = (string) \URL::to('/dashboard/sitemap/explore/', $cID);
                 $nodes[] = $n;
             }
         }
+
         return $nodes;
     }
 
     /**
      * @param \Concrete\Core\Page\Page|int $cItem
      * @param bool $includeChildren
+     *
      * @return stdClass
      */
-    public function getNode($cItem, $includeChildren = true)
+    public function getNode($cItem, $includeChildren = true, $onGetNode = null)
     {
         if (!is_object($cItem)) {
             $cID = $cItem;
@@ -152,11 +156,8 @@ class Sitemap
         $canAddExternalLinks = $cp->canAddExternalLink();
 
         $nodeOpen = false;
-        $openNodeArray = explode(',', str_replace('_', '', $_COOKIE['ConcreteSitemap-expand']));
-        if (is_array($openNodeArray)) {
-            if (in_array($cID, $openNodeArray)) {
-                $nodeOpen = true;
-            }
+        if (in_array($cID, $this->expandedNodes)) {
+            $nodeOpen = true;
         }
 
         $numSubpages = ($c->getNumChildren()  > 0) ? $c->getNumChildren()  : '';
@@ -182,7 +183,7 @@ class Sitemap
                 if ($cID == 1) {
                     $cIconClass = 'fa fa-home';
                 } elseif ($numSubpages > 0) {
-                    $cIconClass= 'fa fa-folder-o';
+                    $cIconClass = 'fa fa-folder-o';
                 } else {
                     $cIconClass = 'fa fa-file-o';
                 }
@@ -200,7 +201,6 @@ class Sitemap
                 $cIconClass = 'fa fa-sign-out';
                 $cAlias = 'LINK';
             }
-
         }
 
         /*
@@ -212,7 +212,7 @@ class Sitemap
 
         */
 
-        $node = new stdClass;
+        $node = new stdClass();
         $node->title = $cvName;
         $node->link = $c->getCollectionLink();
         if ($numSubpages > 0) {
@@ -226,12 +226,16 @@ class Sitemap
         if ($cID == HOME_CID) {
             $node->addClass = 'ccm-page-home';
         }
+        if ($nodeOpen) {
+            $node->expand = true;
+        }
         $node->cAlias = $cAlias;
         $node->isInTrash = $isInTrash;
         $node->numSubpages = $numSubpages;
         $node->isTrash = $isTrash;
         $node->cID = $cID;
         $node->key = $cID;
+        $node->ptID = $c->getPageTypeID();
         $node->canEditPageProperties = $canEditPageProperties;
         $node->canEditPageSpeedSettings = $canEditPageSpeedSettings;
         $node->canEditPagePermissions = $canEditPagePermissions;
@@ -242,9 +246,13 @@ class Sitemap
         $node->canAddSubpages = $canAddSubpages;
         $node->canAddExternalLinks = $canAddExternalLinks;
 
-        if ($includeChildren && ($cID == 1 || ($nodeOpen && $this->autoOpenNodes))) {
+        if ($includeChildren && ($cID == 1 || $nodeOpen)) {
             // We open another level
-            $node->children = $this->getSubNodes($cID, $level, false, $autoOpenNodes);
+            $node->children = $this->getSubNodes($cID, $onGetNode);
+        }
+
+        if ($onGetNode instanceof \Closure) {
+            $node = $onGetNode($node);
         }
 
         return $node;
@@ -256,7 +264,7 @@ class Sitemap
     public function canRead()
     {
         $tp = new TaskPermission();
+
         return $tp->canAccessSitemap();
     }
-
 }

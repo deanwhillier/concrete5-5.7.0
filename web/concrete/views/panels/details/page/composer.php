@@ -6,7 +6,7 @@ $cID = $c->getCollectionID();
 <section class="ccm-ui">
 	<header><?=t('Composer - %s', $pagetype->getPageTypeDisplayName())?></header>
 	<form method="post" data-panel-detail-form="compose">
-		<?=Loader::helper('concrete/ui/help')->notify('panel', '/page/composer')?>
+		<?=Loader::helper('concrete/ui/help')->display('panel', '/page/composer')?>
 
 		<? Loader::helper('concrete/composer')->display($pagetype, $c); ?>
 	</form>
@@ -56,14 +56,16 @@ ConcretePageComposerDetail = {
 	start: function() {
 		var my = this;
 	    $('button[data-page-type-composer-form-btn=discard]').on('click', function() {
-	    	my.disableAutosave();
-	    	$.concreteAjax({
-	    		'url': '<?=$controller->action('discard')?>',
-	    		'data': {cID: '<?=$cID?>'},
-	    		success: function(r) {
-					window.location.href = r.redirectURL;
-	    		}
-	    	});
+			if (confirm('<?=t('This will remove this draft and it cannot be undone. Are you sure?')?>')) {
+		    	my.disableAutosave();
+		    	$.concreteAjax({
+		    		'url': '<?=$controller->action('discard')?>',
+		    		'data': {cID: '<?=$cID?>'},
+		    		success: function(r) {
+						window.location.href = r.redirectURL;
+		    		}
+		    	});
+			}
 		});
 
 	    $('button[data-page-type-composer-form-btn=preview]').on('click', function() {

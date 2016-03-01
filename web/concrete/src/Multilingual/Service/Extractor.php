@@ -8,6 +8,7 @@ use Gettext\Translations;
 use Gettext\Generators\Po as PoGenerator;
 use Gettext\Generators\Mo as MoGenerator;
 use Concrete\Core\Package\PackageList;
+use Config;
 
 defined('C5_EXECUTE') or die("Access Denied.");
 
@@ -19,6 +20,7 @@ class Extractor
     public function extractTranslatableSiteStrings()
     {
         $translations = new Translations();
+        $translations->insert('SiteName', Config::get('concrete.site'));
         $phpParser = new \C5TL\Parser\Php();
         $blockTemplatesParser = new \C5TL\Parser\BlockTemplates();
         $themesPresetsParser = new \C5TL\Parser\ThemePresets();
@@ -127,7 +129,7 @@ class Extractor
             /* @var $package \Concrete\Core\Package\Package */
             $baseDir = $package->getPackagePath() . '/' . DIRNAME_LANGUAGES . '/' . $section->getLocale() . '/LC_MESSAGES';
             $poFile = $baseDir . '/messages.po';
-            $moFile = $baseDir . '/messages.po';
+            $moFile = $baseDir . '/messages.mo';
             $packageTranslations = null;
             if (is_file($poFile)) {
                 $packageTranslations = PoExtractor::fromFile($poFile);
@@ -192,14 +194,14 @@ class Extractor
                 $data['msgstrPlurals'] = implode("\x00", $plurals);
             }
             $comments = $translation->getExtractedComments();
-            if (!empty($plurals)) {
+            if (!empty($comments)) {
                 $data['comments'] = implode("\n", $comments);
             }
             $references = $translation->getReferences();
             if (!empty($references)) {
                 $data['reference'] = '';
                 foreach ($translation->getReferences() as $reference) {
-                    $data['reference'] .= implode(':', $reference) . "\n";
+                    $data['reference'] .= (isset($reference[1]) ? implode(':', $reference) : $reference[0]) . "\n";
                 }
             }
             $flags = $translation->getFlags();

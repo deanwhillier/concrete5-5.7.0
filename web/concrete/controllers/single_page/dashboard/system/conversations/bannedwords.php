@@ -14,7 +14,7 @@ class BannedWords extends DashboardPageController {
 
 	public function view() {
 		$this->set('bannedWords',$this->getBannedWords());
-		$this->set('bannedListEnabled',Config::get('conversation.banned_words'));
+		$this->set('bannedListEnabled',Config::get('conversations.banned_words'));
 	}
 
 	public function getBannedWords() {
@@ -30,6 +30,16 @@ class BannedWords extends DashboardPageController {
 	}
 
 	public function save() {
+		$this->view();
+
+		/** @var Token $token */
+		$token = \Core::make('token');
+
+		if (!$token->validate("update_banned_words")) {
+			$this->error->add('Invalid Token.');
+			return;
+		}
+
 		$db = Loader::db();
 		$db->execute("TRUNCATE TABLE BannedWords");
 		$db->execute("ALTER TABLE BannedWords AUTO_INCREMENT=0");
@@ -38,8 +48,7 @@ class BannedWords extends DashboardPageController {
 				BannedWord::add($bw);
 			}
 		}
-		Config::save('conversation.banned_words',!!$this->post('banned_list_enabled'));
-		$this->view();
+		Config::save('conversations.banned_words',!!$this->post('banned_list_enabled'));
 		$this->redirect('dashboard/system/conversations/bannedwords/success');
 	}
 

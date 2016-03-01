@@ -139,7 +139,7 @@ class DateTime
             }
             $html .= '>';
             // This prints out the translation of "AM" in the current language
-            $html .= $dh->date('A', mktime(1));
+            $html .= $dh->date('A', mktime(1), 'app');
             $html .= '</option>';
             $html .= '<option value="PM" ';
             if ($timeAMPM == 'PM') {
@@ -147,7 +147,7 @@ class DateTime
             }
             $html .= '>';
             // This prints out the translation of "PM" in the current language
-            $html .= $dh->date('A', mktime(13));
+            $html .= $dh->date('A', mktime(13), 'app');
             $html .= '</option>';
             $html .= '</select>';
         }
@@ -160,7 +160,15 @@ class DateTime
                     altFormat: "yy-mm-dd",
                     altField: "#' . $id . '_dt",
                     changeYear: true,
-                    showAnim: \'fadeIn\'
+                    showAnim: \'fadeIn\',
+                    onClose: function(dateText, inst) {
+                        if(dateText == "") {
+                            var altField = $(inst.settings["altField"]);
+                            if(altField.length) {
+                                altField.val(dateText);
+                            }
+                        }
+                    }
                 }).datepicker("setDate" , ' . $defaultDateJs . '); })</script>';
         }
         // first we add a calendar input
@@ -206,9 +214,13 @@ EOS;
     public function date($field, $value = null, $calendarAutoStart = true)
     {
         $dh = Core::make('helper/date'); /* @var $dh \Concrete\Core\Localization\Service\Date */
+        $fh = Core::make("helper/form");
         $id = preg_replace("/[^0-9A-Za-z-]/", "_", $field);
-        if (isset($_REQUEST[$field])) {
-            $timestamp = empty($_REQUEST[$field]) ? false : @strtotime($_REQUEST[$field]);
+
+        $requestValue = $fh->getRequestValue($field);
+
+        if ($requestValue !== false) {
+            $timestamp = empty($requestValue) ? false : @strtotime($requestValue);
         } elseif ($value) {
             $timestamp = @strtotime($value);
         } elseif ($value === '') {
@@ -223,7 +235,7 @@ EOS;
             $defaultDateJs = '""';
         }
         $html = '';
-        $html .= '<div><span class="ccm-input-date-wrapper" id="' . $id . '_dw"><input id="' . $id . '_pub" class="form-control ccm-input-date"  /><input id="' . $id . '" name="' . $field . '" type="hidden"  /></span></div>';
+        $html .= '<div><span class="ccm-input-date-wrapper" id="' . $id . '_dw"><input id="' . $id . '_pub" type="text" class="form-control ccm-input-date"  /><input id="' . $id . '" name="' . $field . '" type="hidden"  /></span></div>';
         $jh = Core::make('helper/json'); /* @var $jh \Concrete\Core\Http\Service\Json */
         if ($calendarAutoStart) {
             $html .= '<script type="text/javascript">$(function () {
@@ -232,7 +244,15 @@ EOS;
                     altFormat: "yy-mm-dd",
                     altField: "#' . $id . '",
                     changeYear: true,
-                    showAnim: \'fadeIn\'
+                    showAnim: \'fadeIn\',
+                    onClose: function(dateText, inst) {
+                        if(dateText == "") {
+                            var altField = $(inst.settings["altField"]);
+                            if(altField.length) {
+                                altField.val(dateText);
+                            }
+                        }
+                    }
                 }).datepicker( "setDate" , ' . $defaultDateJs . ' ); });</script>';
         }
 

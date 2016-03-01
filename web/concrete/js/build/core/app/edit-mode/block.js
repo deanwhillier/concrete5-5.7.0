@@ -212,7 +212,7 @@
             this.getContainer().replaceWith(new_block_elem);
 
             this.getArea().scanBlocks();
-            return this.getArea().getBlockByID(new_block_elem.data('block-id'));
+            return this.getArea().getBlockByID(this.getId());
         },
 
         getMenuElem: function blockGetMenuElem() {
@@ -246,7 +246,7 @@
                 });
 
                 $menuElem.find('a[data-menu-action=block_scrapbook]').unbind('click.core').on('click.core', function (event) {
-                    Concrete.event.fire('EditModeBlockAddToClipboard', {block: my, event: event});
+                    Concrete.event.fire('EditModeBlockAddToClipboard', {block: my, event: event, token: $(this).data('token')});
                 });
 
                 $menuElem.find('a[data-menu-action=delete_block]').unbind('click.core').on('click.core', function (event) {

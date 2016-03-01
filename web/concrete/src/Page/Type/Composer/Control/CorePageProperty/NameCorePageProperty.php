@@ -1,7 +1,8 @@
 <?php
+
 namespace Concrete\Core\Page\Type\Composer\Control\CorePageProperty;
 
-use Loader;
+use Core;
 use Page;
 
 class NameCorePageProperty extends CorePageProperty
@@ -11,8 +12,12 @@ class NameCorePageProperty extends CorePageProperty
     public function __construct()
     {
         $this->setCorePagePropertyHandle('name');
-        $this->setPageTypeComposerControlName(tc('PageTypeComposerControlName', 'Page Name'));
         $this->setPageTypeComposerControlIconSRC(ASSETS_URL . '/attributes/text/icon.png');
+    }
+
+    public function getPageTypeComposerControlName()
+    {
+        return tc('PageTypeComposerControlName', 'Page Name');
     }
 
     public function publishToPage(Page $c, $data, $controls)
@@ -34,23 +39,28 @@ class NameCorePageProperty extends CorePageProperty
 
     public function validate()
     {
-        $e = Loader::helper('validation/error');
+        $e = Core::make('helper/validation/error');
         $val = $this->getRequestValue();
         if ($val['name']) {
             $name = $val['name'];
         } else {
             $name = $this->getPageTypeComposerControlDraftValue();
         }
-        if (!$name) {
-            $e->add(t('You haven\'t chosen a page name.'));
+        
+        /** @var \Concrete\Core\Utility\Service\Validation\Strings $stringValidator */
+        $stringValidator = Core::make('helper/validation/strings');
+        if (!$stringValidator->notempty($name)) {
+            $control = $this->getPageTypeComposerFormLayoutSetControlObject();
+            $e->add(t('You haven\'t chosen a valid %s', $control->getPageTypeComposerControlDisplayLabel()));
+
             return $e;
         }
     }
 
-    public function getRequestValue()
+    public function getRequestValue($args = false)
     {
-        $data = parent::getRequestValue();
-        $data['name'] = Loader::helper('security')->sanitizeString($data['name']);
+        $data = parent::getRequestValue($args);
+        $data['name'] = Core::make('helper/security')->sanitizeString($data['name']);
 
         return $data;
     }
@@ -59,8 +69,8 @@ class NameCorePageProperty extends CorePageProperty
     {
         if (is_object($this->page)) {
             $c = $this->page;
+
             return $c->getCollectionName();
         }
     }
-
 }

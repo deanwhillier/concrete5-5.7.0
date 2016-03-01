@@ -41,6 +41,13 @@ $("#ccm-file-import-tabs a").click(function() {
 	$("#" + ccm_fiActiveTab + "-tab").show();
 });
 
+$('#check-all-incoming').click(function (event) {
+    var checked = this.checked;
+    $('.ccm-file-select-incoming').each(function () {
+        this.checked = checked;
+    });
+});
+
 ConcreteFileImportDialog = {
 
     addFiles: function() {
@@ -49,7 +56,7 @@ ConcreteFileImportDialog = {
             $form.concreteAjaxForm({
                 success: function(r) {
                     jQuery.fn.dialog.closeTop();
-                    ConcreteEvent.trigger('FileManagerUpdateRequestComplete');
+                    ConcreteEvent.trigger('FileManagerAddFilesComplete', {files: r.files});
                 }
             }).submit();
         }
@@ -77,7 +84,9 @@ ConcreteFileImportDialog = {
     <input type="hidden" name="ocID" value="<?=$ocID?>" />
 		<table id="incoming_file_table" class="table table-striped" width="100%" cellpadding="0" cellspacing="0">
 			<tr>
-				<th width="10%" valign="middle" class="center theader"></th>
+				<th width="10%" valign="middle" class="center theader">
+                    <input type="checkbox" id="check-all-incoming"/>
+				</th>
 				<th width="20%" valign="middle" class="center theader"></th>
 				<th width="45%" valign="middle" class="theader"><?=t('Filename')?></th>
 				<th width="25%" valign="middle" class="center theader"><?=t('Size')?></th>
@@ -87,7 +96,7 @@ ConcreteFileImportDialog = {
 		?>
 			<tr>
 				<td width="10%" style="vertical-align: middle" class="center">
-					<?php if($fh->extension($file['extension'])) { ?>
+					<?php if($fh->extension($file['basename'])) { ?>
 						<input type="checkbox" name="send_file<?=$i?>" class="ccm-file-select-incoming" value="<?=$file['basename']?>" />
 					<?php } ?>
 				</td>

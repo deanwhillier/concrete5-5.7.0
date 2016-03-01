@@ -1,11 +1,11 @@
 <?
 defined('C5_EXECUTE') or die("Access Denied.");
-$html = Loader::helper('html');
-$dh = Loader::helper('concrete/dashboard');
-$ihm = Loader::helper('concrete/ui/menu');
-$valt = Loader::helper('validation/token');
+$html = Core::make('helper/html');
+$dh = Core::make('helper/concrete/dashboard');
+$ihm = Core::make('helper/concrete/ui/menu');
+$valt = Core::make('helper/validation/token');
 $token = '&' . $valt->getParameter();
-$logouttoken = Loader::helper('validation/token')->generate('logout');
+$logouttoken = $valt->generate('logout');
 $cID = $c->getCollectionID();
 $permissions = new Permissions($c);
 
@@ -30,6 +30,18 @@ if (isset($cp) && $canViewToolbar && (!$dh->inDashboard())) {
         }
     }
 
+    if (!$c->isEditMode()) {
+       print Core::make('helper/concrete/ui/help')->displayHelpDialogLauncher();
+    }
+
+    $cih = Core::make("helper/concrete/ui");
+    if ($cih->showHelpOverlay()) {
+        View::element('help/dialog/introduction');
+        $v = View::getInstance();
+        $v->addFooterItem('<script type="text/javascript">$(function() { new ConcreteHelpDialog().open(); });</script>');
+        $cih->trackHelpOverlayDisplayed();
+    }
+
     ?>
 
     <div id="ccm-page-controls-wrapper" class="ccm-ui">
@@ -40,7 +52,7 @@ if (isset($cp) && $canViewToolbar && (!$dh->inDashboard())) {
                 <? if (!$pageInUseBySomeoneElse && $c->getCollectionPointerID() == 0) { ?>
                     <? if ($c->isEditMode()) { ?>
                         <li class="ccm-toolbar-page-edit-mode-active ccm-toolbar-page-edit"><i
-                                class="fa fa-pencil mobile-leading-icon"></i><a data-toolbar-action="check-in"
+                                class="fa fa-pencil mobile-leading-icon"></i><a <? if ($c->isMasterCollection()) { ?>data-disable-panel="check-in"<? } ?> data-toolbar-action="check-in"
                                                                                 <? if ($vo->isNew() && !$c->isMasterCollection()) { ?>href="javascript:void(0)"
                                                                                 data-launch-panel="check-in"><?php echo t(
                                     'Save Changes') ?><?
@@ -48,14 +60,13 @@ if (isset($cp) && $canViewToolbar && (!$dh->inDashboard())) {
                                     ?>href="<?= URL::to(
                                         '/ccm/system/page/check_in',
                                         $c->getCollectionID(),
-                                        Loader::helper(
-                                            'validation/token')
-                                              ->generate()) ?>" data-panel-url="<?= URL::to(
+                                        $valt->generate()) ?>" data-panel-url="<?= URL::to(
                                         '/ccm/system/panels/page/check_in') ?>"><?php echo t(
                                         'Save Changes') ?><?
                                 } ?></a></li>
                     <? } else if ($permissions->canEditPageContents()) { ?>
                         <li class="ccm-toolbar-page-edit"><i class="fa fa-pencil mobile-leading-icon"></i><a
+                                <? if ($c->isMasterCollection()) { ?>data-disable-panel="check-in"<? } ?>
                                 data-toolbar-action="check-out"
                                 href="<?= DIR_REL ?>/<?= DISPATCHER_FILENAME ?>?cID=<?= $c->getCollectionID() ?>&ctask=check-out<?= $token ?>"><?php echo t(
                                     'Edit this Page') ?></a></li>
@@ -146,44 +157,53 @@ if (isset($cp) && $canViewToolbar && (!$dh->inDashboard())) {
                         href="<?= URL::to('/dashboard') ?>"><?php echo t('Dashboard') ?><i
                             class="fa fa-caret-down"></i></a>
                     <ul class="list-unstyled">
-                        <li class="last-li"><a href="<?= View::url('/dashboard/sitemap') ?>"><?php echo t(
+                        <li class="last-li"><a href="<?= URL::to('/dashboard/sitemap') ?>"><?php echo t(
                                     'Sitemap'); ?></a></li>
-                        <li class="last-li"><a href="<?= View::url('/dashboard/files') ?>"><?php echo t(
+                        <li class="last-li"><a href="<?= URL::to('/dashboard/files') ?>"><?php echo t(
                                     'Files'); ?></a></li>
-                        <li class="last-li"><a href="<?= View::url('/dashboard/users') ?>"><?php echo t(
+                        <li class="last-li"><a href="<?= URL::to('/dashboard/users') ?>"><?php echo t(
                                     'Members'); ?></a></li>
-                        <li class="last-li"><a href="<?= View::url('/dashboard/reports') ?>"><?php echo t(
+                        <li class="last-li"><a href="<?= URL::to('/dashboard/reports') ?>"><?php echo t(
                                     'Reports'); ?></a></li>
-                        <li class="last-li"><a href="<?= View::url('/dashboard/pages') ?>"><?php echo t(
+                        <li class="last-li"><a href="<?= URL::to('/dashboard/pages') ?>"><?php echo t(
                                     'Pages & Themes'); ?></a></li>
-                        <li class="last-li"><a href="<?= View::url('/dashboard/workflow') ?>"><?php echo t(
+                        <li class="last-li"><a href="<?= URL::to('/dashboard/workflow') ?>"><?php echo t(
                                     'Workflow'); ?></a></li>
-                        <li class="last-li"><a href="<?= View::url('/dashboard/blocks/stacks') ?>"><?php echo t(
+                        <li class="last-li"><a href="<?= URL::to('/dashboard/blocks/stacks') ?>"><?php echo t(
                                     'Stacks & Blocks'); ?></a></li>
-                        <li class="last-li"><a href="<?= View::url('/dashboard/extend') ?>"><?php echo t(
+                        <li class="last-li"><a href="<?= URL::to('/dashboard/extend') ?>"><?php echo t(
                                     'Extend concrete5'); ?></a></li>
-                        <li class="last-li"><a href="<?= View::url('/dashboard/system') ?>"><?php echo t(
+                        <li class="last-li"><a href="<?= URL::to('/dashboard/system') ?>"><?php echo t(
                                     'System & Settings'); ?></a></li>
                     </ul>
                 </li>
                 <? } ?>
+                <li>
+                    <i class="fa fa-sign-out mobile-leading-icon"></i><a href="<?= URL::to('/login', 'logout', $valt->generate('logout')); ?>"><?= t('Sign Out'); ?></a>
+                </li>
             </ul>
         </div>
     </div>
     <ul class="ccm-toolbar-item-list">
-        <li class="ccm-logo pull-left"><span><?= Loader::helper('concrete/ui')->getToolbarLogoSRC() ?></span></li>
+        <li class="ccm-logo pull-left"><span><?= Core::make('helper/concrete/ui')->getToolbarLogoSRC() ?></span></li>
         <? if ($c->isMasterCollection()) { ?>
-        <li class="pull-left"><a href="<?= View::url('/dashboard/pages/types') ?>"><i class="fa fa-arrow-left"></i></a>
+        <li class="pull-left">
+            <a href="<?php echo URL::to('/dashboard/pages/types/output', $c->getPageTypeID()); ?>">
+                <i class="fa fa-arrow-left"></i>
+                <span class="ccm-toolbar-accessibility-title ccm-toolbar-accessibility-title-edit-mode">
+                    <?php echo tc('toolbar', 'Exit Edit Defaults'); ?>
+                </span>
+            </a>
             <? } ?>
             <? if (!$pageInUseBySomeoneElse && $c->getCollectionPointerID() == 0) { ?>
 
             <? if ($c->isEditMode()) { ?>
-        <li class="ccm-toolbar-page-edit-mode-active ccm-toolbar-page-edit pull-left hidden-xs">
-            <a data-toolbar-action="check-in" <? if ($vo->isNew() || $c->isPageDraft()) { ?>href="javascript:void(0)"
+        <li data-guide-toolbar-action="check-in"  class="ccm-toolbar-page-edit-mode-active ccm-toolbar-page-edit pull-left hidden-xs">
+            <a <? if ($c->isMasterCollection()) { ?>data-disable-panel="check-in"<? } ?> data-toolbar-action="check-in" <? if ($vo->isNew() || $c->isPageDraft()) { ?>href="javascript:void(0)"
                data-launch-panel="check-in" <? } else { ?>href="<?= URL::to(
                 '/ccm/system/page/check_in',
                 $c->getCollectionID(),
-                Loader::helper('validation/token')->generate()) ?>"<? } ?>
+                $valt->generate()) ?>"<? } ?>
                data-panel-url="<?= URL::to('/ccm/system/panels/page/check_in') ?>"
                title="<?= t('Exit Edit Mode') ?>">
                 <i class="fa fa-pencil"></i>
@@ -193,8 +213,8 @@ if (isset($cp) && $canViewToolbar && (!$dh->inDashboard())) {
             </a>
         </li>
     <? } else if ($permissions->canEditPageContents()) { ?>
-        <li class="ccm-toolbar-page-edit pull-left hidden-xs">
-            <a data-toolbar-action="check-out"
+        <li data-guide-toolbar-action="edit-page" class="ccm-toolbar-page-edit pull-left hidden-xs">
+            <a <? if ($c->isMasterCollection()) { ?>data-disable-panel="check-in"<? } ?> data-toolbar-action="check-out"
                href="<?= DIR_REL ?>/<?= DISPATCHER_FILENAME ?>?cID=<?= $c->getCollectionID() ?>&ctask=check-out<?= $token ?>"
                title="<?= t('Edit This Page') ?>">
                 <i class="fa fa-pencil"></i>
@@ -210,14 +230,22 @@ if (isset($cp) && $canViewToolbar && (!$dh->inDashboard())) {
                 $permissions->canEditPageTheme() ||
                 $permissions->canEditPageTemplate() ||
                 $permissions->canDeletePage() ||
-                $permissions->canEditPagePermissions())) { ?>
-        <li class="pull-left hidden-xs">
+                $permissions->canEditPagePermissions())) {
+                $hasComposer = is_object($pagetype) && $cp->canEditPageContents(); ?>
+        <li data-guide-toolbar-action="page-settings" class="pull-left hidden-xs">
             <a href="#" data-launch-panel="page"
                data-panel-url="<?= URL::to('/ccm/system/panels/page') ?>"
+               <? if ($hasComposer) { ?>}
+               title="<?= t('Composer, Page Design, Location, Attributes and Settings') ?>">
+               <? } else { ?>
                title="<?= t('Page Design, Location, Attributes and Settings') ?>">
+               <? } ?>
                 <i class="fa fa-cog"></i>
                 <span class="ccm-toolbar-accessibility-title ccm-toolbar-accessibility-title-settings">
-                    <?= tc('toolbar', 'Settings') ?>
+                    <? if ($hasComposer) { ?>
+                    <?= tc('toolbar', 'Composer') ?> /
+                    <? } ?>
+                    <?= tc('toolbar', 'Page Settings') ?>
                 </span>
             </a>
         </li>
@@ -227,13 +255,13 @@ if (isset($cp) && $canViewToolbar && (!$dh->inDashboard())) {
 
     if ($cp->canEditPageContents() && (!$pageInUseBySomeoneElse)) {
         ?>
-        <li class="ccm-toolbar-add pull-left hidden-xs">
+        <li data-guide-toolbar-action="add-content" class="ccm-toolbar-add pull-left hidden-xs">
             <? if ($c->isEditMode()) { ?>
                 <a href="#" data-launch-panel="add-block" data-panel-url="<?= URL::to('/ccm/system/panels/add') ?>"
                    title="<?= t('Add Content to The Page') ?>">
                     <i class="fa fa-plus"></i>
                     <span class="ccm-toolbar-accessibility-title ccm-toolbar-accessibility-title-add">
-                        <?= tc('toolbar', 'Add') ?>
+                        <?= tc('toolbar', 'Add Content') ?>
                     </span>
                 </a>
             <? } else { ?>
@@ -241,7 +269,7 @@ if (isset($cp) && $canViewToolbar && (!$dh->inDashboard())) {
                    title="<?= t('Add Content to The Page') ?>">
                     <i class="fa fa-plus"></i>
                     <span class="ccm-toolbar-accessibility-title ccm-toolbar-accessibility-title-add">
-                        <?= tc('toolbar', 'Add') ?>
+                        <?= tc('toolbar', 'Add Content') ?>
                     </span>
                 </a>
             <? } ?>
@@ -261,9 +289,9 @@ if (isset($cp) && $canViewToolbar && (!$dh->inDashboard())) {
         }
     }
 
-    if (Loader::helper('concrete/ui')->showWhiteLabelMessage()) {
+    if (Core::make('helper/concrete/ui')->showWhiteLabelMessage()) {
         ?>
-        <li class="pull-left" id="ccm-white-label-message"><?= t(
+        <li class="pull-left visible-xs visible-lg" id="ccm-white-label-message"><?= t(
                 'Powered by <a href="%s">concrete5</a>.',
                 Config::get('concrete.urls.concrete5')) ?></li>
     <? } ?>
@@ -272,7 +300,7 @@ if (isset($cp) && $canViewToolbar && (!$dh->inDashboard())) {
             <i class="fa fa-bars fa-2"></i>
         </li>
         <? if ($dh->canRead()) { ?>
-        <li class="pull-right hidden-xs ">
+        <li data-guide-toolbar-action="dashboard" class="pull-right hidden-xs ">
             <a href="<?= URL::to('/dashboard') ?>" data-launch-panel="dashboard"
                                              title="<?= t('Dashboard – Change Site-wide Settings') ?>">
                 <i class="fa fa-sliders"></i>
@@ -284,24 +312,24 @@ if (isset($cp) && $canViewToolbar && (!$dh->inDashboard())) {
         </li>
         <? } else { ?>
             <li class="pull-right hidden-xs ">
-                <a href="<?=URL::to('/login', 'logout', Loader::helper('validation/token')->generate('logout'))?>" title="<?=t('Sign Out')?>"><i class="fa fa-sign-out"></i>
+                <a href="<?=URL::to('/login', 'logout', $valt->generate('logout'))?>" title="<?=t('Sign Out')?>"><i class="fa fa-sign-out"></i>
                 <span class="ccm-toolbar-accessibility-title ccm-toolbar-accessibility-title-site-settings">
                     <?= tc('toolbar', 'Sign Out') ?>
                 </span>
                 </a>
             </li>
         <? } ?>
-        <li class="pull-right hidden-xs">
+        <li data-guide-toolbar-action="sitemap" class="pull-right hidden-xs">
             <a href="#" data-panel-url="<?= URL::to('/ccm/system/panels/sitemap') ?>"
                                             title="<?= t('Add Pages and Navigate Your Site') ?>"
                                             data-launch-panel="sitemap">
                         <i class="fa fa-files-o"></i>
                 <span class="ccm-toolbar-accessibility-title ccm-toolbar-accessibility-title-add-page">
-                    <?= tc('toolbar', 'Add Page') ?>
+                    <?= tc('toolbar', 'Pages') ?>
                 </span>
             </a>
         </li>
-        <? if ($cp->canEditPageMultilingualSettings() && Config::get('concrete.multilingual.enabled')) {
+        <? if ($cp->canEditPageMultilingualSettings() && \Core::make('multilingual/detector')->isEnabled()) {
             $section = \Concrete\Core\Multilingual\Page\Section\Section::getCurrentSection();
             $ch = Core::make('multilingual/interface/flag');
             if (is_object($section)) { ?>
@@ -317,8 +345,8 @@ if (isset($cp) && $canViewToolbar && (!$dh->inDashboard())) {
                 </li>
             <? } ?>
         <? } ?>
-        <li class="ccm-toolbar-search pull-right hidden-xs"><i class="fa fa-search"></i> <input type="search"
-                                                                                                id="ccm-nav-intelligent-search"
+        <li data-guide-toolbar-action="intelligent-search" class="ccm-toolbar-search pull-right hidden-xs"><i class="fa fa-search"></i> <input type="search"
+                                                                                                id="ccm-nav-intelligent-search" autocomplete="off"
                                                                                                 tabindex="1"/></li>
         <?
         $items = $ihm->getPageHeaderMenuItems('right');
@@ -343,7 +371,7 @@ if (isset($cp) && $canViewToolbar && (!$dh->inDashboard())) {
     ?>
 
     <? if ($pageInUseBySomeoneElse) { ?>
-        <?= Loader::helper('concrete/ui')->notify(
+        <?= Core::make('helper/concrete/ui')->notify(
             array(
                 'title'   => t('Editing Unavailable.'),
                 'message' => t("%s is currently editing this page.", $c->getCollectionCheckedOutUserName()),
@@ -359,11 +387,12 @@ if (isset($cp) && $canViewToolbar && (!$dh->inDashboard())) {
             $buttons[] = '<a href="' . DIR_REL . '/' . DISPATCHER_FILENAME . '?cID=' . $c->getCollectionID() . '" class="btn btn-default btn-xs">' . t(
                     'View/Edit Original') . '</a>';
             if ($canApprovePageVersions) {
-                $buttons[] = '<a href="' . DIR_REL . '/' . DISPATCHER_FILENAME . '?cID=' . $c->getCollectionPointerOriginalID() . '&ctask=remove-alias' . $token . '" class="btn btn-xs btn-danger">' . t(
+                $url = URL::to('/ccm/system/dialogs/page/delete_alias?cID=' . $c->getCollectionPointerOriginalID());
+                $buttons[] = '<a href="' . $url . '" dialog-title="' . t('Remove Alias') . '" class="dialog-launch btn btn-xs btn-danger">' . t(
                         'Remove Alias') . '</a>';
             }
 
-            print Loader::helper('concrete/ui')->notify(
+            print Core::make('helper/concrete/ui')->notify(
                 array(
                     'title'   => t('Page Alias.'),
                     'message' => t("This page is an alias of one that actually appears elsewhere."),
@@ -438,7 +467,7 @@ if (isset($cp) && $canViewToolbar && (!$dh->inDashboard())) {
                 if (!$vo->isApproved() && !$c->isEditMode()) {
 
                     if ($c->isPageDraft()) {
-                    print Loader::helper('concrete/ui')->notify(
+                    print Core::make('helper/concrete/ui')->notify(
                         array(
                             'title'   => t('Page Draft.'),
                             'message' => t("This is an un-published draft."),
@@ -451,12 +480,23 @@ if (isset($cp) && $canViewToolbar && (!$dh->inDashboard())) {
                             $pk = \Concrete\Core\Permission\Key\PageKey::getByHandle('approve_page_versions');
                             $pk->setPermissionObject($c);
                             $pa = $pk->getPermissionAccessObject();
+
+                            $workflows = array();
+                            $canApproveWorkflow = true;
                             if (is_object($pa)) {
-                                if (count($pa->getWorkflows()) > 0) {
-                                    $appLabel = t('Submit for Approval');
+                                $workflows = $pa->getWorkflows();
+                            }
+                            foreach($workflows as $wf) {
+                                if (!$wf->canApproveWorkflow()) {
+                                    $canApproveWorkflow = false;
                                 }
                             }
-                            if (!$appLabel) {
+
+                            if (count($workflows) > 0 && !$canApproveWorkflow) {
+                                $appLabel = t('Submit to Workflow');
+                            }
+
+                            if (!isset($appLabel) || !$appLabel) {
                                 $appLabel = t('Approve Version');
                             }
 
@@ -464,7 +504,7 @@ if (isset($cp) && $canViewToolbar && (!$dh->inDashboard())) {
 
                         }
 
-                        print Loader::helper('concrete/ui')->notify(
+                        print Core::make('helper/concrete/ui')->notify(
                             array(
                                 'title'   => t('Page is Pending Approval.'),
                                 'message' => t("This page is newer than what appears to visitors on your live site."),

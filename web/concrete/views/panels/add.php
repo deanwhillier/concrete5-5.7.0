@@ -63,8 +63,9 @@ switch ($tab) {
                 ?>
                 <div class="ccm-panel-add-block-stack-item"
                      data-panel-add-block-drag-item="stack-item"
-                     data-cID="<?= intval($stack->getCollectionID()) ?>"
-                     data-block-type-handle="<?= t('stack') ?>"
+                     data-cID="<?= intval($c->getCollectionID()) ?>"
+                     data-sID="<?= intval($stack->getCollectionID()) ?>"
+                     data-block-type-handle="stack"
                      data-has-add-template="no"
                      data-supports-inline-add="no"
                      data-btID="0"
@@ -175,6 +176,7 @@ switch ($tab) {
         <div id="ccm-panel-add-clipboard-block-list">
             <?php
             /** @var PileContent[] $contents */
+            $pileToken = Core::make('token')->generate('tools/clipboard/from');
             foreach ($contents as $pile_content) {
                 $block = Block::getByID($pile_content->getItemID());
 
@@ -188,6 +190,7 @@ switch ($tab) {
                      data-panel-add-block-drag-item="clipboard-item"
                      data-name="<?= h($type->getBlockTypeName()) ?>"
                      data-cID="<?= $c->getCollectionID() ?>"
+                     data-token="<?= $pileToken ?>"
                      data-block-type-handle="<?= $type->getBlockTypeHandle() ?>"
                      data-dialog-title="<?= t('Add %s', t($type->getBlockTypeName())) ?>"
                      data-dialog-width="<?= $type->getBlockTypeInterfaceWidth() ?>"
@@ -238,7 +241,8 @@ switch ($tab) {
                     $.post(CCM_TOOLS_PATH + '/pile_manager', {
                         task: 'delete',
                         pcID: item.data('pcid'),
-                        cID: item.data('cid')
+                        cID: item.data('cid'),
+                        ccm_token: item.data('token')
                     }, function() {
                         item.remove();
                     }).fail(function(data) {
@@ -291,6 +295,9 @@ switch ($tab) {
                                 $blocktypes = array();
                             }
                             if (count($blocktypes)) {
+
+                                usort ( $blocktypes, function($bt_a, $bt_b) use($set){return ($set->displayOrder($bt_a) > $set->displayOrder($bt_b))?1:-1;});
+
                                 foreach ($blocktypes as $bt) {
 
                                     $btIcon = $ci->getBlockTypeIconURL($bt);

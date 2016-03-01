@@ -119,7 +119,7 @@ $db = Loader::db();
                             <input type="hidden" name="action" value="deleteFormAnswers"/>
                             <?php $valt->output('deleteFormAnswers') ?>
                             <div class="btn-group">
-                                <a href="<?= DIR_REL . '/index.php?cID=' . $c->getCollectionID() . '&qsid=' . $qsid ?>"
+                                <a href="<?= URL::to($c->getCollectionPath() . '?qsid=' . $qsid) ?>"
                                    class="btn btn-default btn-sm">
                                     <?= t('View Responses') ?>
                                 </a>
@@ -210,7 +210,7 @@ else {
     <? } else: { ?>
 
         <div class="ccm-dashboard-header-buttons">
-            <a id="ccm-export-results" class="btn btn-success" href="<?= $view->action('csv', '?qsid=' . $questionSet) ?>">
+            <a id="ccm-export-results" class="btn btn-success" href="<?= $view->action('csv')?>?qsid=<?=$questionSet ?>">
                 <i class='fa fa-download'></i> <?= t('Export to CSV') ?>
             </a>
         </div>
@@ -263,7 +263,7 @@ else {
                                 $file = File::getByID($fID);
                                 if ($fID && $file) {
                                     $fileVersion = $file->getApprovedVersion();
-                                    echo '<td><a href="' . $fileVersion->getRelativePath() . '">' .
+                                    echo '<td><a href="' . $fileVersion->getUrl() . '">' .
                                         $text->entities($fileVersion->getFileName()) . '</a></td>';
                                 } else {
                                     echo '<td>' . t('File not found') . '</td>';
@@ -286,7 +286,7 @@ else {
                                 <input type="hidden" name="asid" value="<?= intval($answerSet['asID']) ?>"/>
                                 <input type="hidden" name="action" value="deleteResponse"/>
                                 <?php $valt->output('deleteResponse') ?>
-                                <?= $ih->submit(t('Delete'), false, 'left', 'btn pull-right btn-danger') ?>
+                                <?= $ih->submit(t('Delete'), false, 'left', 'btn pull-right btn-danger delete-response') ?>
                             </form>
                         </td>
                     </tr>

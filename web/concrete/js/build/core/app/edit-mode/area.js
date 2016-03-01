@@ -29,7 +29,7 @@
                 blocks: [],
                 editMode: edit_mode,
                 maximumBlocks: parseInt(elem.data('maximumBlocks'), 10),
-                blockTypes: elem.data('accepts-block-types').split(' '),
+                blockTypes: elem.data('accepts-block-types').toLowerCase().split(' '),
                 blockContainer: elem.children('.ccm-area-block-list')
             });
             my.id = my.getId();
@@ -43,6 +43,15 @@
         },
 
         /**
+         * Get this area in the passed edit mode context
+         * @param Concrete.EditMode edit_mode
+         * @returns Concrete.Area|null
+         */
+        inEditMode: function areaInEditMode(edit_mode) {
+            return edit_mode.getAreaByID(this.getId());
+        },
+
+        /**
          * Handle unbinding.
          */
         destroy: function areaDestroy() {
@@ -50,6 +59,8 @@
             if (my.getAttr('menu')) {
                 my.getAttr('menu').destroy();
             }
+
+            Concrete.event.unbind(".ccm-area-a" + this.getId());
 
             my.reset();
         },
@@ -71,7 +82,7 @@
         },
 
         bindEvent: function areaBindEvent(event, handler) {
-            return Concrete.EditMode.prototype.bindEvent.apply(this, _(arguments).toArray());
+            return Concrete.EditMode.prototype.bindEvent.call(this, event + ".ccm-area-a" + this.getId(), handler);
         },
 
         scanBlocks: function areaScanBlocks() {
@@ -91,7 +102,9 @@
                     type = Concrete.Block;
                 }
 
-                block = new type(me, my);
+                block = new type(me, my.getEditMode());
+                block.setArea(my);
+
                 my.addBlock(block);
             });
         },
@@ -172,6 +185,48 @@
                     return false;
                 });
 
+            $menuElem.find('a[data-menu-action=edit-container-layout-style]')
+                .off('click.edit-mode')
+                .on('click.edit-mode', function (e) {
+                    e.preventDefault();
+                    // we are going to place this at the END of the list.
+                    var $link = $(this);
+                    var bID = parseInt($(this).attr('data-container-layout-block-id'));
+                    var editor = Concrete.getEditMode();
+                    var block = _.findWhere(editor.getBlocks(), {id: bID});
+                    Concrete.event.fire('EditModeBlockEditInline', {
+                        block: block, event: e, action: CCM_DISPATCHER_FILENAME + '/ccm/system/dialogs/block/design'
+                    });
+                });
+
+            $menuElem.find('a[data-menu-action=area-add-block]')
+                .off('click.edit-mode')
+                .on('click.edit-mode', function(e) {
+                    var max = my.getMaximumBlocks();
+                    if (max < 0 || max > my.getTotalBlocks()) {
+                        my.getEditMode().setNextBlockArea(my);
+                        var panelButton = $('[data-launch-panel="add-block"]');
+                        panelButton.click();
+                    } else {
+                        ConcreteAlert.error({'message' : ccmi18n.fullArea});
+                    }
+                    return false;
+                });
+
+            my.bindEvent('ConcreteMenuShow', function(e, data) {
+                if (data.menu == my.getAttr('menu')) {
+                    var max = my.getMaximumBlocks(),
+                        list_item = data.menu.$menuPointer.find('a[data-menu-action=area-add-block]').parent();
+
+                    if (max < 0 || max > my.getTotalBlocks()) {
+                        list_item.show();
+                    } else {
+                        list_item.hide();
+                    }
+                }
+            });
+
+
             $menuElem.find('a[data-menu-action=edit-area-design]')
                 .off('click.edit-mode')
                 .on('click.edit-mode', function (e) {
@@ -201,6 +256,15 @@
 
 
                 });
+        },
+
+        /**
+         * Does this area accept a specific block type handle
+         * @param type_handle the block type handle
+         * @returns {bool}
+         */
+        acceptsBlockType: function areaAcceptsBlockType(type_handle) {
+            return _(this.getBlockTypes()).contains(type_handle.toLowerCase());
         },
 
         /**

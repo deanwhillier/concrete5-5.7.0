@@ -65,7 +65,6 @@ return array(
         'PageTheme'                            => '\Concrete\Core\Page\Theme\Theme',
         'PageType'                             => '\Concrete\Core\Page\Type\Type',
         'PermissionAccess'                     => '\Concrete\Core\Permission\Access\Access',
-        'PermissionCache'                      => '\Concrete\Core\Permission\Cache',
         'PermissionKey'                        => '\Concrete\Core\Permission\Key\Key',
         'PermissionKeyCategory'                => '\Concrete\Core\Permission\Category',
         'Permissions'                          => '\Concrete\Core\Permission\Checker',
@@ -80,10 +79,8 @@ return array(
         'StackList'                            => '\Concrete\Core\Page\Stack\StackList',
         'StartingPointPackage'                 => '\Concrete\Core\Package\StartingPointPackage',
         'TaskPermission'                       => '\Concrete\Core\Legacy\TaskPermission',
-        'URL'                                  => '\Concrete\Core\Routing\URL',
         'User'                                 => '\Concrete\Core\User\User',
         'UserAttributeKey'                     => '\Concrete\Core\Attribute\Key\UserKey',
-        'UserInfo'                             => '\Concrete\Core\User\UserInfo',
         'UserList'                             => '\Concrete\Core\User\UserList',
         'View'                                 => '\Concrete\Core\View\View',
         'Workflow'                             => '\Concrete\Core\Workflow\Workflow'
@@ -93,6 +90,9 @@ return array(
      * Core Providers
      */
     'providers'           => array(
+        // Router service provider
+        'core_router' => 'Concrete\Core\Routing\RoutingServiceProvider',
+
         'core_file'                   => '\Concrete\Core\File\FileServiceProvider',
         'core_encryption'             => '\Concrete\Core\Encryption\EncryptionServiceProvider',
         'core_validation'             => '\Concrete\Core\Validation\ValidationServiceProvider',
@@ -100,11 +100,15 @@ return array(
         'core_multilingual'           => '\Concrete\Core\Multilingual\MultilingualServiceProvider',
         'core_feed'                   => '\Concrete\Core\Feed\FeedServiceProvider',
         'core_html'                   => '\Concrete\Core\Html\HtmlServiceProvider',
-        'core_pagination'             => '\Concrete\Core\Search\PaginationServiceProvider',
+        'core_editor'                 => '\Concrete\Core\Editor\EditorServiceProvider',
         'core_mail'                   => '\Concrete\Core\Mail\MailServiceProvider',
         'core_application'            => '\Concrete\Core\Application\ApplicationServiceProvider',
         'core_utility'                => '\Concrete\Core\Utility\UtilityServiceProvider',
+        'core_content_importer'       => '\Concrete\Core\Backup\ContentImporter\ContentImporterServiceProvider',
         'core_manager_grid_framework' => '\Concrete\Core\Page\Theme\GridFramework\ManagerServiceProvider',
+        'core_manager_pagination_view' => '\Concrete\Core\Search\Pagination\View\ManagerServiceProvider',
+        'core_manager_page_type_validator' => '\Concrete\Core\Page\Type\Validator\ManagerServiceProvider',
+        'core_manager_layout_preset_provider' => '\Concrete\Core\Area\Layout\Preset\Provider\ManagerServiceProvider',
         'core_database'     => '\Concrete\Core\Database\DatabaseServiceProvider',
         'core_form'         => '\Concrete\Core\Form\FormServiceProvider',
         'core_session'      => '\Concrete\Core\Session\SessionServiceProvider',
@@ -114,13 +118,21 @@ return array(
         'core_whoops'       => '\Concrete\Core\Error\Provider\WhoopsServiceProvider',
         'core_logging'      => '\Concrete\Core\Logging\LoggingServiceProvider',
         'core_cache'        => '\Concrete\Core\Cache\CacheServiceProvider',
+        'core_url'          => '\Concrete\Core\Url\UrlServiceProvider',
+        'core_devices'      => '\Concrete\Core\Device\DeviceServiceProvider',
+        'core_imageeditor'  => '\Concrete\Core\ImageEditor\EditorServiceProvider',
+        'core_user'  => '\Concrete\Core\User\UserServiceProvider',
 
         // Authentication
         'core_oauth'          => '\Concrete\Core\Authentication\Type\OAuth\ServiceProvider',
         'core_auth_community' => '\Concrete\Core\Authentication\Type\Community\ServiceProvider',
         'core_auth_facebook'  => '\Concrete\Core\Authentication\Type\Facebook\ServiceProvider',
         'core_auth_google'    => '\Concrete\Core\Authentication\Type\Google\ServiceProvider',
-        'core_auth_twitter'   => '\Concrete\Core\Authentication\Type\Twitter\ServiceProvider'
+        'core_auth_twitter'   => '\Concrete\Core\Authentication\Type\Twitter\ServiceProvider',
+
+        // Validator
+        'core_validator'          => '\Concrete\Core\Validator\ValidatorServiceProvider',
+        'core_validator_password' => '\Concrete\Core\Validator\PasswordValidatorServiceProvider',
     ),
 
     /**
@@ -134,9 +146,11 @@ return array(
         'ORM'      => '\Concrete\Core\Support\Facade\DatabaseORM',
         'Events'   => '\Concrete\Core\Support\Facade\Events',
         'Route'    => '\Concrete\Core\Support\Facade\Route',
+        'UserInfo' => '\Concrete\Core\Support\Facade\UserInfoFactory',
         'Log'      => '\Concrete\Core\Support\Facade\Log',
         'Image'    => '\Concrete\Core\Support\Facade\Image',
-        'Config'   => '\Concrete\Core\Support\Facade\Config'
+        'Config'   => '\Concrete\Core\Support\Facade\Config',
+        'URL'      => '\Concrete\Core\Support\Facade\Url'
     ),
 
     /**
@@ -150,11 +164,11 @@ return array(
         "/ccm/system/dialogs/area/design/"                                              => array('\Concrete\Controller\Dialog\Area\Design::view'),
         "/ccm/system/dialogs/area/design/reset"                                         => array('\Concrete\Controller\Dialog\Area\Design::reset'),
         "/ccm/system/dialogs/area/design/submit"                                        => array('\Concrete\Controller\Dialog\Area\Design::submit'),
-        "/ccm/system/dialogs/area/layout/presets/{arLayoutID}"                          => array('\Concrete\Controller\Dialog\Area\Layout\Presets::view'),
-        "/ccm/system/dialogs/area/layout/presets/{arLayoutID}/submit"                   => array('\Concrete\Controller\Dialog\Area\Layout\Presets::submit'),
-        "/ccm/system/dialogs/area/layout/presets/get/{arLayoutPresetID}"                => array('\Concrete\Controller\Dialog\Area\Layout\Presets::getPresetData'),
         "/ccm/system/dialogs/area/layout/presets/manage/"                               => array('\Concrete\Controller\Dialog\Area\Layout\Presets\Manage::view'),
         "/ccm/system/dialogs/area/layout/presets/manage/delete"                         => array('\Concrete\Controller\Dialog\Area\Layout\Presets\Manage::delete'),
+        "/ccm/system/dialogs/area/layout/presets/{arLayoutID}"                          => array('\Concrete\Controller\Dialog\Area\Layout\Presets::view'),
+        "/ccm/system/dialogs/area/layout/presets/{arLayoutID}/submit"                   => array('\Concrete\Controller\Dialog\Area\Layout\Presets::submit'),
+        "/ccm/system/dialogs/area/layout/presets/get/{cID}/{arLayoutPresetID}"                => array('\Concrete\Controller\Dialog\Area\Layout\Presets::getPresetData'),
 
         "/ccm/system/dialogs/block/aliasing/"                                           => array('\Concrete\Controller\Dialog\Block\Aliasing::view'),
         "/ccm/system/dialogs/block/aliasing/submit"                                     => array('\Concrete\Controller\Dialog\Block\Aliasing::submit'),
@@ -169,11 +183,18 @@ return array(
         "/ccm/system/dialogs/block/permissions/guest_access/"                           => array('\Concrete\Controller\Dialog\Block\Permissions\GuestAccess::__construct'),
         "/ccm/system/dialogs/block/permissions/list/"                                   => array('\Concrete\Controller\Dialog\Block\Permissions::viewList'),
 
+        "/ccm/system/dialogs/file/upload_complete"                                      => array('\Concrete\Controller\Dialog\File\UploadComplete::view'),
         "/ccm/system/dialogs/file/bulk/delete"                                          => array('\Concrete\Controller\Dialog\File\Bulk\Delete::view'),
         "/ccm/system/dialogs/file/bulk/delete/delete_files"                             => array('\Concrete\Controller\Dialog\File\Bulk\Delete::deleteFiles'),
         "/ccm/system/dialogs/file/bulk/properties"                                      => array('\Concrete\Controller\Dialog\File\Bulk\Properties::view'),
+        "/ccm/system/dialogs/file/bulk/sets"                                            => array('\Concrete\Controller\Dialog\File\Bulk\Sets::view'),
+        "/ccm/system/dialogs/file/bulk/sets/submit"                                     => array('\Concrete\Controller\Dialog\File\Bulk\Sets::submit'),
         "/ccm/system/dialogs/file/bulk/properties/clear_attribute"                      => array('\Concrete\Controller\Dialog\File\Bulk\Properties::clearAttribute'),
         "/ccm/system/dialogs/file/bulk/properties/update_attribute"                     => array('\Concrete\Controller\Dialog\File\Bulk\Properties::updateAttribute'),
+        "/ccm/system/dialogs/file/bulk/storage"                                         => array('\Concrete\Controller\Dialog\File\Bulk\Storage::view'),
+        "/ccm/system/dialogs/file/bulk/storage/submit"                                  => array('\Concrete\Controller\Dialog\File\Bulk\Storage::submit'),
+        "/ccm/system/dialogs/file/sets"                                                 => array('\Concrete\Controller\Dialog\File\Sets::view'),
+        "/ccm/system/dialogs/file/sets/submit"                                          => array('\Concrete\Controller\Dialog\File\Sets::submit'),
         "/ccm/system/dialogs/file/properties"                                           => array('\Concrete\Controller\Dialog\File\Properties::view'),
         "/ccm/system/dialogs/file/properties/clear_attribute"                           => array('\Concrete\Controller\Dialog\File\Properties::clear_attribute'),
         "/ccm/system/dialogs/file/properties/save"                                      => array('\Concrete\Controller\Dialog\File\Properties::save'),
@@ -223,6 +244,17 @@ return array(
         "/ccm/system/dialogs/user/search"                                               => array('\Concrete\Controller\Dialog\User\Search::view'),
         "/ccm/system/dialogs/user/search/customize"                                     => array('\Concrete\Controller\Dialog\User\Search\Customize::view'),
         "/ccm/system/dialogs/user/search/customize/submit"                              => array('\Concrete\Controller\Dialog\User\Search\Customize::submit'),
+        /**
+         * Conversations
+         */
+        "/ccm/system/dialogs/conversation/subscribe/{cnvID}"                            => array('\Concrete\Controller\Dialog\Conversation\Subscribe::view'),
+        "/ccm/system/dialogs/conversation/subscribe/subscribe/{cnvID}"                  => array('\Concrete\Controller\Dialog\Conversation\Subscribe::subscribe'),
+        "/ccm/system/dialogs/conversation/subscribe/unsubscribe/{cnvID}"                => array('\Concrete\Controller\Dialog\Conversation\Subscribe::unsubscribe'),
+
+        /**
+         * Help
+         */
+        "/ccm/system/dialogs/help/introduction/"                                        => array('\Concrete\Controller\Dialog\Help\Introduction::view'),
 
         /**
          * Files
@@ -252,19 +284,27 @@ return array(
         "/ccm/system/page/multilingual/assign"                                          => array('\Concrete\Controller\Backend\Page\Multilingual::assign'),
         "/ccm/system/page/multilingual/create_new"                                      => array('\Concrete\Controller\Backend\Page\Multilingual::create_new'),
         "/ccm/system/page/multilingual/ignore"                                          => array('\Concrete\Controller\Backend\Page\Multilingual::ignore'),
+        "/ccm/system/page/multilingual/unmap"                                           => array('\Concrete\Controller\Backend\Page\Multilingual::unmap'),
+        "/ccm/system/page/select_sitemap"                                           => array('\Concrete\Controller\Backend\Page\SitemapSelector::view'),
 
         /**
          * Block actions - non UI
          */
         "/ccm/system/block/render/"                                                     => array('\Concrete\Controller\Backend\Block::render'),
+        "/ccm/system/block/action/add/{cID}/{arHandle}/{btID}/{action}"                 => array('\Concrete\Controller\Backend\Block\Action::add'),
+        "/ccm/system/block/action/edit/{cID}/{arHandle}/{bID}/{action}"                 => array('\Concrete\Controller\Backend\Block\Action::edit'),
+        "/ccm/system/block/action/add_composer/{ptComposerFormLayoutSetControlID}/{action}"  => array('\Concrete\Controller\Backend\Block\Action::add_composer'),
+        "/ccm/system/block/action/edit_composer/{cID}/{arHandle}/{ptComposerFormLayoutSetControlID}/{action}"  => array('\Concrete\Controller\Backend\Block\Action::edit_composer'),
 
         /**
          * Misc
          */
-        "/ccm/system/css/layout/{bID}"                                                  => array('\Concrete\Controller\Frontend\Stylesheet::layout'),
+        "/ccm/system/css/layout/{arLayoutID}"                                                  => array('\Concrete\Controller\Frontend\Stylesheet::layout'),
         "/ccm/system/css/page/{cID}/{stylesheet}/{cvID}"                                => array('\Concrete\Controller\Frontend\Stylesheet::page_version'),
         "/ccm/system/css/page/{cID}/{stylesheet}"                                       => array('\Concrete\Controller\Frontend\Stylesheet::page'),
         "/ccm/system/backend/editor_data/"                                              => array('\Concrete\Controller\Backend\EditorData::view'),
+        "/ccm/system/backend/get_remote_help/"                                          => array('\Concrete\Controller\Backend\GetRemoteHelp::view'),
+        "/ccm/system/backend/intelligent_search/"                                       => array('\Concrete\Controller\Backend\IntelligentSearch::view'),
         "/ccm/system/jobs"                                                              => array('\Concrete\Controller\Frontend\Jobs::view'),
         "/ccm/system/jobs/run_single"                                                   => array('\Concrete\Controller\Frontend\Jobs::run_single'),
         "/ccm/system/jobs/check_queue"                                                  => array('\Concrete\Controller\Frontend\Jobs::check_queue'),
@@ -312,12 +352,12 @@ return array(
         "/ccm/system/panels/page/check_in"                                              => array('\Concrete\Controller\Panel\Page\CheckIn::__construct'),
         "/ccm/system/panels/page/check_in/submit"                                       => array('\Concrete\Controller\Panel\Page\CheckIn::submit'),
         "/ccm/system/panels/page/design"                                                => array('\Concrete\Controller\Panel\Page\Design::view'),
-        "/ccm/system/panels/page/design/customize/{pThemeID}"                           => array('\Concrete\Controller\Panel\Page\Design\Customize::view'),
+        "/ccm/system/panels/page/design/customize/reset_page_customizations"            => array('\Concrete\Controller\Panel\Page\Design\Customize::reset_page_customizations'),
         "/ccm/system/panels/page/design/customize/apply_to_page/{pThemeID}"             => array('\Concrete\Controller\Panel\Page\Design\Customize::apply_to_page'),
         "/ccm/system/panels/page/design/customize/apply_to_site/{pThemeID}"             => array('\Concrete\Controller\Panel\Page\Design\Customize::apply_to_site'),
         "/ccm/system/panels/page/design/customize/preview/{pThemeID}"                   => array('\Concrete\Controller\Panel\Page\Design\Customize::preview'),
-        "/ccm/system/panels/page/design/customize/reset_page_customizations"            => array('\Concrete\Controller\Panel\Page\Design\Customize::reset_page_customizations'),
         "/ccm/system/panels/page/design/customize/reset_site_customizations/{pThemeID}" => array('\Concrete\Controller\Panel\Page\Design\Customize::reset_site_customizations'),
+        "/ccm/system/panels/page/design/customize/{pThemeID}"                           => array('\Concrete\Controller\Panel\Page\Design\Customize::view'),
         "/ccm/system/panels/page/design/preview_contents"                               => array('\Concrete\Controller\Panel\Page\Design::preview_contents'),
         "/ccm/system/panels/page/design/submit"                                         => array('\Concrete\Controller\Panel\Page\Design::submit'),
         "/ccm/system/panels/page/preview_as_user"                                       => array('\Concrete\Controller\Panel\Page\PreviewAsUser::view'),
@@ -329,6 +369,8 @@ return array(
         "/ccm/system/panels/page/versions/new_page"                                     => array('\Concrete\Controller\Panel\Page\Versions::new_page'),
         "/ccm/system/panels/page/versions/delete"                                       => array('\Concrete\Controller\Panel\Page\Versions::delete'),
         "/ccm/system/panels/page/versions/approve"                                      => array('\Concrete\Controller\Panel\Page\Versions::approve'),
+        "/ccm/system/panels/page/devices"                                               => array('\Concrete\Controller\Panel\Page\Devices::view'),
+        "/ccm/system/panels/page/devices/preview"                                       => array('\Concrete\Controller\Panel\Page\Devices::preview'),
         "/ccm/system/panels/sitemap"                                                    => array('\Concrete\Controller\Panel\Sitemap::view'),
 
         /**
@@ -353,6 +395,8 @@ return array(
         "/ccm/system/panels/details/page/seo"                                           => array('\Concrete\Controller\Panel\Detail\Page\Seo::view'),
         "/ccm/system/panels/details/page/seo/submit"                                    => array('\Concrete\Controller\Panel\Detail\Page\Seo::submit'),
         "/ccm/system/panels/details/page/versions"                                      => array('\Concrete\Controller\Panel\Detail\Page\Versions::view'),
+        "/ccm/system/panels/details/page/devices"                                       => array('\Concrete\Controller\Panel\Page\Devices::detail'),
+
 
         /**
          * RSS Feeds
@@ -367,18 +411,18 @@ return array(
          */
         "/dashboard/blocks/stacks/list"                                                 => array('\Concrete\Controller\SinglePage\Dashboard\Blocks\Stacks::list_page'),
 
-        /**
-         * Tools - legacy
+        /*
+         * Assets localization
          */
-        "/tools/blocks/{btHandle}/{tool}"                                               => array(
-            '\Concrete\Core\Legacy\Controller\ToolController::displayBlock',
-            'blockTool',
-            array('tool' => '[A-Za-z0-9_/.]+')),
-        "/tools/{tool}"                                                                 => array(
-            '\Concrete\Core\Legacy\Controller\ToolController::display',
-            'tool',
-            array('tool' => '[A-Za-z0-9_/.]+')),
-
+        '/ccm/assets/localization/core/js'                                              => array('\Concrete\Controller\Frontend\AssetsLocalization::getCoreJavascript'),
+        '/ccm/assets/localization/select2/js'                                           => array('\Concrete\Controller\Frontend\AssetsLocalization::getSelect2Javascript'),
+        '/ccm/assets/localization/redactor/js'                                          => array('\Concrete\Controller\Frontend\AssetsLocalization::getRedactorJavascript'),
+        '/ccm/assets/localization/dynatree/js'                                          => array('\Concrete\Controller\Frontend\AssetsLocalization::getDynatreeJavascript'),
+        '/ccm/assets/localization/imageeditor/js'                                       => array('\Concrete\Controller\Frontend\AssetsLocalization::getImageEditorJavascript'),
+        '/ccm/assets/localization/jquery/ui/js'                                         => array('\Concrete\Controller\Frontend\AssetsLocalization::getJQueryUIJavascript'),
+        '/ccm/assets/localization/translator/js'                                        => array('\Concrete\Controller\Frontend\AssetsLocalization::getTranslatorJavascript'),
+        '/ccm/assets/localization/dropzone/js'                                          => array('\Concrete\Controller\Frontend\AssetsLocalization::getDropzoneJavascript'),
+        '/ccm/assets/localization/conversations/js'                                     => array('\Concrete\Controller\Frontend\AssetsLocalization::getConversationsJavascript'),
     ),
 
     /**
@@ -390,7 +434,10 @@ return array(
         '/account'          => VIEW_CORE_THEME,
         '/account/*'        => VIEW_CORE_THEME,
         '/install'          => VIEW_CORE_THEME,
-        '/login'            => VIEW_CORE_THEME,
+        '/login'            => array(
+            VIEW_CORE_THEME,
+            VIEW_CORE_THEME_TEMPLATE_BACKGROUND_IMAGE
+        ),
         '/register'         => VIEW_CORE_THEME,
         '/maintenance_mode' => VIEW_CORE_THEME,
         '/upgrade'          => VIEW_CORE_THEME
@@ -422,7 +469,7 @@ return array(
         t('MP4')            => array('mp4', FileType::T_VIDEO),
         t('FLV')            => array('flv', FileType::T_VIDEO, 'flv'),
         t('MP3')            => array('mp3', FileType::T_AUDIO, false, 'audio'),
-        t('MP4')            => array('m4a', FileType::T_AUDIO, false, 'audio'),
+        t('MP4 Audio')            => array('m4a', FileType::T_AUDIO, false, 'audio'),
         t('Realaudio')      => array('ra,ram', FileType::T_AUDIO),
         t('Windows Audio')  => array('wma', FileType::T_AUDIO),
         t('Rich Text')      => array('rtf', FileType::T_DOCUMENT),
@@ -463,6 +510,7 @@ return array(
         ),
         'jquery/ui'                => array(
             array('javascript', 'js/jquery-ui.js', array('minify' => false, 'combine' => false)),
+            array('javascript-localized', '/ccm/assets/localization/jquery/ui/js'),
             array('css', 'css/jquery-ui.css', array('minify' => false))
         ),
         'jquery/visualize'                => array(
@@ -472,30 +520,44 @@ return array(
         'jquery/touch-punch'              => array(
             array('javascript', 'js/jquery-ui-touch-punch.js')
         ),
+        'jquery/tristate'              => array(
+            array('javascript', 'js/jquery-tristate.js')
+        ),
         'select2'                  => array(
             array('javascript', 'js/select2.js', array('minify' => false, 'combine' => false)),
+            array('javascript-localized', '/ccm/assets/localization/select2/js'),
             array('css', 'css/select2.css', array('minify' => false))
-        ),
-        'select2_locale'           => array(
-            array(
-                'javascript',
-                REL_DIR_FILES_TOOLS_REQUIRED . '/i18n_select2_js',
-                array(
-                    'combine' => false,
-                    'minify'  => false,
-                    'local'   => false))
         ),
         'underscore'               => array(
             array('javascript', 'js/underscore.js', array('minify' => false))
         ),
+        'backbone'               => array(
+            array('javascript', 'js/backbone.js', array('minify' => false))
+        ),
         'dropzone'                 => array(
-            array('javascript', 'js/dropzone.js')
+            array('javascript', 'js/dropzone.js'),
+            array('javascript-localized', '/ccm/assets/localization/dropzone/js'),
+            array('css', 'css/dropzone.css', array('minify' => false))
         ),
         'jquery/form'              => array(
             array('javascript', 'js/jquery-form.js')
         ),
         'picturefill'              => array(
             array('javascript', 'js/picturefill.js', array('minify' => false))
+        ),
+        'responsive-slides'              => array(
+            array('javascript', 'js/responsive-slides.js', array('minify' => false)),
+            array('css', 'css/responsive-slides.css', array('minify' => false))
+        ),
+        'html5-shiv'              => array(
+            array('javascript-conditional', 'js/ie/html5-shiv.js',
+                array('conditional' => 'lt IE 9')
+            )
+        ),
+        'respond'                 => array(
+            array('javascript-conditional', 'js/ie/respond.js',
+                array('conditional' => 'lt IE 9')
+            )
         ),
         'spectrum'                 => array(
             array('javascript', 'js/spectrum.js', array('minify' => false)),
@@ -511,12 +573,39 @@ return array(
             array('javascript', 'js/style-customizer.js', array('minify' => false)),
             array('css', 'css/style-customizer.css', array('minify' => false))
         ),
-        'core/locale' => array(
-            array(
-                'javascript',
-                REL_DIR_FILES_TOOLS_REQUIRED . '/i18n_js',
-                array('combine' => false, 'minify' => false, 'local' => false)
-            )
+        'core/localization' => array(
+            array('javascript-localized', '/ccm/assets/localization/core/js'),
+        ),
+        'core/frontend/parallax-image'               => array(
+            array('javascript', 'js/frontend/parallax-image.js', array('minify' => false))
+        ),
+        'core/imageeditor/control/position' => array(
+            array('css', 'css/image-editor/controls/position.css'),
+            array('javascript', 'js/image-editor/controls/position.js')
+        ),
+        'core/imageeditor/control/filter' => array(
+            array('css', 'css/image-editor/controls/filter.css'),
+            array('javascript', 'js/image-editor/controls/filter.js')
+        ),
+        'core/imageeditor/filter/gaussian_blur' => array(
+            array('css', 'css/image-editor/filters/gaussian_blur.css'),
+            array('javascript', 'js/image-editor/filters/gaussian_blur.js')
+        ),
+        'core/imageeditor/filter/none' => array(
+            array('css', 'css/image-editor/filters/none.css'),
+            array('javascript', 'js/image-editor/filters/none.js')
+        ),
+        'core/imageeditor/filter/sepia' => array(
+            array('css', 'css/image-editor/filters/sepia.css'),
+            array('javascript', 'js/image-editor/filters/sepia.js')
+        ),
+        'core/imageeditor/filter/vignette' => array(
+            array('css', 'css/image-editor/filters/vignette.css'),
+            array('javascript', 'js/image-editor/filters/vignette.js')
+        ),
+        'core/imageeditor/filter/grayscale' => array(
+            array('css', 'css/image-editor/filters/grayscale.css'),
+            array('javascript', 'js/image-editor/filters/grayscale.js')
         ),
         'jquery/awesome-rating'                 => array(
             array('javascript', 'js/jquery-awesome-rating.js', array('minify' => false)),
@@ -525,19 +614,16 @@ return array(
         'jquery/fileupload'        => array(
             array('javascript', 'js/jquery-fileupload.js')
         ),
+        'jquery/textcounter'        => array(
+            array('javascript', 'js/textcounter.js')
+        ),
         'swfobject'                => array(
             array('javascript', 'js/swfobject.js')
         ),
         'redactor'                 => array(
             array('javascript', 'js/redactor.js', array('minify' => false)),
+            array('javascript-localized', '/ccm/assets/localization/redactor/js'),
             array('css', 'css/redactor.css')
-        ),
-        'redactor_locale'          => array(
-            array(
-                'javascript',
-                REL_DIR_FILES_TOOLS_REQUIRED . '/i18n_redactor_js',
-                array('combine' => false, 'minify' => false, 'local' => false)
-            )
         ),
         'ace'                      => array(
             array('javascript', 'js/ace/ace.js', array('minify' => false))
@@ -547,14 +633,8 @@ return array(
         ),
         'dynatree'                 => array(
             array('javascript', 'js/dynatree.js', array('minify' => false)),
+            array('javascript-localized', '/ccm/assets/localization/dynatree/js', array('minify' => false)),
             array('css', 'css/dynatree.css', array('minify' => false))
-        ),
-        'dynatree_locale'          => array(
-            array(
-                'javascript',
-                REL_DIR_FILES_TOOLS_REQUIRED . '/i18n_dynatree_js',
-                array('combine' => false, 'minify' => false, 'local' => false)
-            )
         ),
         'bootstrap/dropdown'       => array(
             array('javascript', 'js/bootstrap/dropdown.js'),
@@ -598,18 +678,8 @@ return array(
         ),
         'core/imageeditor'         => array(
             array('javascript', 'js/image-editor.js'),
+            array('javascript-localized', '/ccm/assets/localization/imageeditor/js'),
             array('css', 'css/image-editor.css')
-        ),
-        'core/imageeditor_locale'  => array(
-            array(
-                'javascript',
-                REL_DIR_FILES_TOOLS_REQUIRED . '/i18n_imageeditor_js',
-                array(
-                    'combine' => false,
-                    'minify'  => false,
-                    'local'   => false
-                )
-            )
         ),
         'dashboard'                => array(
             array('javascript', 'js/dashboard.js')
@@ -649,6 +719,7 @@ return array(
         ),
         'core/conversation'        => array(
             array('javascript', 'js/conversations.js'),
+            array('javascript-localized', '/ccm/assets/localization/conversations/js'),
             array('css', 'css/conversations.css')
         ),
         'core/lightbox'            => array(
@@ -662,9 +733,10 @@ return array(
             array('javascript', 'js/account.js'),
             array('css', 'css/account.css')
         ),
-        'core/legacy'              => array(
-            array('javascript', 'js/legacy.js'),
-            array('css', 'css/legacy.css')
+        'core/translator' => array(
+            array('javascript', 'js/translator.js', array('minify' => false)),
+            array('javascript-localized', '/ccm/assets/localization/translator/js'),
+            array('css', 'css/translator.css', array('minify' => false))
         )
     ),
     'asset_groups'        => array(
@@ -672,6 +744,7 @@ return array(
         'jquery/ui'                => array(
             array(
                 array('javascript', 'jquery/ui'),
+                array('javascript-localized', 'jquery/ui'),
                 array('css', 'jquery/ui'),
             )
         ),
@@ -684,8 +757,21 @@ return array(
         'select2'                  => array(
             array(
                 array('javascript', 'select2'),
-                array('javascript', 'select2_locale'),
+                array('javascript-localized', 'select2'),
                 array('css', 'select2')
+            )
+        ),
+        'dropzone'                  => array(
+            array(
+                array('javascript', 'dropzone'),
+                array('javascript-localized', 'dropzone'),
+                array('css', 'dropzone')
+            )
+        ),
+        'responsive-slides'                  => array(
+            array(
+                array('javascript', 'responsive-slides'),
+                array('css', 'responsive-slides')
             )
         ),
         'ace'         => array(
@@ -697,7 +783,7 @@ return array(
             array(
                 array('javascript', 'jquery'),
                 array('javascript', 'core/events'),
-                array('javascript', 'core/locale'),
+                array('javascript-localized', 'core/localization'),
                 array('javascript', 'spectrum'),
                 array('css', 'spectrum')
             )
@@ -719,12 +805,13 @@ return array(
             array(
                 array('javascript', 'jquery'),
                 array('javascript', 'jquery/ui'),
+                array('javascript-localized', 'jquery/ui'),
                 array('javascript', 'core/events'),
                 array('javascript', 'underscore'),
+                array('javascript', 'backbone'),
                 array('javascript', 'core/colorpicker'),
+                array('javascript-localized', 'core/localization'),
                 array('javascript', 'core/app'),
-                array('javascript', 'core/locale'),
-                array('javascript', 'core/legacy'),
                 array('javascript', 'jquery/fileupload'),
                 array('javascript', 'core/file-manager'),
                 array('javascript', 'core/style-customizer'),
@@ -748,7 +835,7 @@ return array(
         'redactor'                 => array(
             array(
                 array('javascript', 'redactor'),
-                array('javascript', 'redactor_locale'),
+                array('javascript-localized', 'redactor'),
                 array('css', 'redactor'),
                 array('css', 'font-awesome')
             )
@@ -756,7 +843,7 @@ return array(
         'dynatree'                 => array(
             array(
                 array('javascript', 'dynatree'),
-                array('javascript', 'dynatree_locale'),
+                array('javascript-localized', 'dynatree'),
                 array('css', 'dynatree')
             )
         ),
@@ -765,13 +852,14 @@ return array(
                 array('javascript', 'jquery'),
                 array('javascript', 'core/events'),
                 array('javascript', 'underscore'),
+                array('javascript', 'backbone'),
                 array('javascript', 'bootstrap/dropdown'),
                 array('javascript', 'bootstrap/tooltip'),
                 array('javascript', 'bootstrap/popover'),
                 array('javascript', 'jquery/ui'),
-                array('javascript', 'core/locale'),
+                array('javascript-localized', 'jquery/ui'),
+                array('javascript-localized', 'core/localization'),
                 array('javascript', 'core/app'),
-                array('javascript', 'core/legacy'),
                 array('css', 'core/app'),
                 array('css', 'font-awesome'),
                 array('css', 'jquery/ui')
@@ -784,8 +872,11 @@ return array(
                 array('javascript', 'bootstrap/tooltip'),
                 array('javascript', 'bootstrap/popover'),
                 array('javascript', 'jquery/ui'),
+                array('javascript-localized', 'jquery/ui'),
                 array('javascript', 'core/events'),
                 array('javascript', 'underscore'),
+                array('javascript', 'backbone'),
+                array('javascript-localized', 'core/localization'),
                 array('javascript', 'core/app'),
                 array('javascript', 'bootstrap-editable'),
                 array('css', 'core/app/editable-fields'),
@@ -795,7 +886,7 @@ return array(
         'core/imageeditor'         => array(
             array(
                 array('javascript', 'kinetic'),
-                array('javascript', 'core/imageeditor_locale'),
+                array('javascript-localized', 'core/imageeditor'),
                 array('javascript', 'core/imageeditor'),
                 array('css', 'core/imageeditor')
             )
@@ -804,8 +895,10 @@ return array(
             array(
                 array('javascript', 'jquery'),
                 array('javascript', 'jquery/ui'),
+                array('javascript-localized', 'jquery/ui'),
                 array('javascript', 'jquery/touch-punch'),
                 array('javascript', 'underscore'),
+                array('javascript', 'backbone'),
                 array('javascript', 'dashboard'),
                 array('javascript', 'core/events'),
                 array('javascript', 'bootstrap/dropdown'),
@@ -813,9 +906,12 @@ return array(
                 array('javascript', 'bootstrap/popover'),
                 array('javascript', 'bootstrap/transition'),
                 array('javascript', 'bootstrap/alert'),
-                array('javascript', 'core/locale'),
+                array('javascript-localized', 'core/localization'),
                 array('javascript', 'core/app'),
                 array('javascript', 'redactor'),
+                array('javascript-localized', 'redactor'),
+                array('javascript-conditional', 'respond'),
+                array('javascript-conditional', 'html5-shiv'),
                 array('css', 'core/app'),
                 array('css', 'redactor'),
                 array('css', 'jquery/ui'),
@@ -831,10 +927,12 @@ return array(
                 array('javascript', 'core/events'),
                 array('javascript', 'bootstrap/tooltip'),
                 array('javascript', 'underscore'),
+                array('javascript', 'backbone'),
                 array('javascript', 'jquery/ui'),
+                array('javascript-localized', 'jquery/ui'),
                 array('javascript', 'select2'),
-                array('javascript', 'select2_locale'),
-                array('javascript', 'core/locale'),
+                array('javascript-localized', 'select2'),
+                array('javascript-localized', 'core/localization'),
                 array('javascript', 'core/app'),
                 array('javascript', 'jquery/fileupload'),
                 array('javascript', 'core/file-manager')
@@ -844,11 +942,13 @@ return array(
             array(
                 array('javascript', 'core/events'),
                 array('javascript', 'underscore'),
+                array('javascript', 'backbone'),
                 array('javascript', 'jquery/ui'),
+                array('javascript-localized', 'jquery/ui'),
                 array('javascript', 'dynatree'),
-                array('javascript', 'dynatree_locale'),
+                array('javascript-localized', 'dynatree'),
+                array('javascript-localized', 'core/localization'),
                 array('javascript', 'core/app'),
-                array('javascript', 'core/locale'),
                 array('javascript', 'core/sitemap'),
                 array('css', 'dynatree'),
                 array('css', 'core/sitemap')
@@ -858,8 +958,9 @@ return array(
             array(
                 array('javascript', 'core/events'),
                 array('javascript', 'jquery/ui'),
+                array('javascript-localized', 'jquery/ui'),
                 array('javascript', 'dynatree'),
-                array('javascript', 'dynatree_locale'),
+                array('javascript-localized', 'dynatree'),
                 array('javascript', 'core/topics'),
                 array('css', 'dynatree'),
                 array('css', 'core/topics')
@@ -870,8 +971,9 @@ return array(
                 array('javascript', 'core/events'),
                 array('javascript', 'underscore'),
                 array('javascript', 'jquery/ui'),
+                array('javascript-localized', 'jquery/ui'),
                 array('javascript', 'dynatree'),
-                array('javascript', 'dynatree_locale'),
+                array('javascript-localized', 'dynatree'),
                 array('javascript', 'core/groups'),
                 array('css', 'dynatree')
             )
@@ -880,6 +982,7 @@ return array(
             array(
                 array('javascript', 'core/gathering'),
                 array('javascript', 'redactor'),
+                array('javascript-localized', 'redactor'),
                 array('css', 'core/gathering/base'),
                 array('css', 'core/conversation'),
                 array('css', 'core/gathering/display'),
@@ -890,14 +993,20 @@ return array(
             array(
                 array('javascript', 'jquery'),
                 array('javascript', 'jquery/ui'),
+                array('javascript-localized', 'jquery/ui'),
                 array('javascript', 'underscore'),
+                array('javascript', 'core/lightbox'),
                 array('javascript', 'dropzone'),
+                array('javascript-localized', 'dropzone'),
                 array('javascript', 'bootstrap/dropdown'),
                 array('javascript', 'core/events'),
                 array('javascript', 'core/conversation'),
+                array('javascript-localized', 'core/conversation'),
                 array('css', 'core/conversation'),
+                array('css', 'core/frontend/errors'),
                 array('css', 'font-awesome'),
                 array('css', 'bootstrap/dropdown'),
+                array('css', 'core/lightbox'),
                 array('css', 'jquery/ui')
             ),
             true
@@ -918,12 +1027,21 @@ return array(
                 array('css', 'core/account')
             )
         ),
+        'core/translator'          => array(
+            array(
+                array('javascript', 'core/translator'),
+                array('javascript-localized', 'core/translator'),
+                array('css', 'core/translator'),
+            )
+        ),
+        /** @deprecated keeping this around because certain themes reference it and we don't want to break them. */
         'core/legacy'              => array(
             array(
-                array('javascript', 'jquery'),
-                array('javascript', 'core/legacy'),
-                array('css', 'core/legacy')
             )
         )
+    ),
+    'curl' => array(
+        'verifyPeer' => true,
+        'connectionTimeout' => 5
     )
 );

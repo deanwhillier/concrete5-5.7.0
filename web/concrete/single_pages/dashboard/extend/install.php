@@ -17,8 +17,12 @@ $nav = \Core::make('helper/navigation');
 
 $catList = AttributeCategory::getList();
 
-if (is_object($pkg)) {
-    $pkgID = $pkg->getPackageID();
+if (isset($pkg)) {
+    if (is_object($pkg)) {
+        $pkgID = $pkg->getPackageID();
+    }
+} else {
+    $pkg = null;
 }
 
 if ($this->controller->getTask() == 'install_package' && $showInstallOptionsScreen && $tp->canInstallPackages()) { ?>
@@ -53,9 +57,8 @@ if ($this->controller->getTask() == 'install_package' && $showInstallOptionsScre
     </form>
 <?php
 } elseif ($this->controller->getTask() == 'uninstall' && $tp->canUninstallPackages()) {
-    $removeBTConfirm = t('This will remove all elements associated with the %s package. This cannot be undone. Are you sure?', $pkg->getPackageHandle());
     ?>
-    <form method="post" class="form-stacked" id="ccm-uninstall-form" action="<?= $view->action('do_uninstall_package'); ?>" onsubmit="<?= h('return confirm(' . json_encode($removeBTConfirm) . ')'); ?>">
+    <form method="post" class="form-stacked" id="ccm-uninstall-form" action="<?= $view->action('do_uninstall_package'); ?>">
         <?= $valt->output('uninstall'); ?>
         <input type="hidden" name="pkgID" value="<?=$pkgID ?>" />
         <fieldset>
@@ -68,7 +71,15 @@ if ($this->controller->getTask() == 'install_package' && $showInstallOptionsScre
                 </tr>
             </table>
 
-            <?php @Loader::packageElement('dashboard/uninstall', $pkg->getPackageHandle()); ?>
+            <?php
+            if ($pkg->hasUninstallNotes()) {
+                View::element('dashboard/uninstall', null, $pkg->getPackageHandle());
+            }
+            ?>
+
+            <div class="alert alert-danger">
+                <?=t('This will remove all elements associated with the %s package. While you can reinstall the package, this may result in data loss.', $pkg->getPackageName())?>
+            </div>
 
             <div class="form-group">
                 <label class="control-label"><?= t('Move package to trash directory on server?'); ?></label>
@@ -117,11 +128,11 @@ if ($this->controller->getTask() == 'install_package' && $showInstallOptionsScre
     }
     if ($tp->canInstallPackages()) {
         foreach (Package::getAvailablePackages() as $_pkg) {
+            if (empty($pkgAvailableArray)) {
+                Localization::clearCache();                
+            }
             $_pkg->setupPackageLocalization();
             $pkgAvailableArray[] = $_pkg;
-        }
-        if(count($pkgAvailableArray) > 0) {
-            Localization::clearCache();
         }
     }
 
@@ -207,7 +218,7 @@ if ($this->controller->getTask() == 'install_package' && $showInstallOptionsScre
                 <dd>
                     <?=$at->getAttributeTypeName()?>
                     <?php
-                    foreach ($catList as $cat) { 
+                    foreach ($catList as $cat) {
                         if (!$at->isAssociatedWithCategory($cat)) {
                             continue;
                         }
@@ -263,7 +274,7 @@ if ($this->controller->getTask() == 'install_package' && $showInstallOptionsScre
         <!-- Show all remaining items that we don't have a better formatting for !-->
 
         <?php
-        foreach ($items as $key => $itemArray) { 
+        foreach ($items as $key => $itemArray) {
             if (!count($itemArray)) {
                 continue;
             }
@@ -290,7 +301,7 @@ if ($this->controller->getTask() == 'install_package' && $showInstallOptionsScre
         <?php
 
      } else {
-        if (is_object($installedPKG) && $installedPKG->hasInstallPostScreen()) {
+        if (isset($installedPKG) && is_object($installedPKG) && $installedPKG->hasInstallPostScreen()) {
             ?>
             <div style="display: none">
                 <div id="ccm-install-post-notes">
@@ -341,7 +352,7 @@ if ($this->controller->getTask() == 'install_package' && $showInstallOptionsScre
         if (count($pkgArray) > 0) {
             foreach ($pkgArray as $pkg) {
                 ?>
-                <div class="media">
+                <div class="media-row">
                     <div class="pull-left"><img style="width: 49px" src="<?= $ci->getPackageIconURL($pkg); ?>" class"media-object" /></div>
                     <div class="media-body">
                         <a href="<?= URL::to('/dashboard/extend/install', 'inspect_package', $pkg->getPackageID()); ?>" class="btn pull-right btn-sm btn-default"><?= t('Details'); ?></a>
@@ -368,7 +379,7 @@ if ($this->controller->getTask() == 'install_package' && $showInstallOptionsScre
                     $file = $pb->getRemoteFileURL();
                     if (!empty($file)) {
                         ?>
-                        <div class="media">
+                        <div class="media-row">
                             <div class="pull-left"><img style="width: 49px" src="<?= $pb->getRemoteIconURL(); ?>" class"media-object" /></div>
                             <div class="media-body">
                                 <a href="<?= URL::to('/dashboard/extend/install', 'download', $pb->getMarketplaceItemID()); ?>" class="btn pull-right btn-sm btn-default"><?= t('Download'); ?></a>
@@ -381,7 +392,7 @@ if ($this->controller->getTask() == 'install_package' && $showInstallOptionsScre
                 }
                 foreach ($availableArray as $obj) {
                     ?>
-                    <div class="media">
+                    <div class="media-row">
                         <div class="pull-left"><img style="width: 49px" src="<?= $ci->getPackageIconURL($obj); ?>" class"media-object" /></div>
                         <div class="media-body">
                             <?php if ($obj instanceof \Concrete\Core\Package\BrokenPackage) { ?>

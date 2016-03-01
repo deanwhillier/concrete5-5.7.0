@@ -9,8 +9,12 @@ class DateTimeCorePageProperty extends CorePageProperty
     public function __construct()
     {
         $this->setCorePagePropertyHandle('date_time');
-        $this->setPageTypeComposerControlName(tc('PageTypeComposerControlName', 'Public Date/Time'));
         $this->setPageTypeComposerControlIconSRC(ASSETS_URL . '/attributes/date_time/icon.png');
+    }
+
+    public function getPageTypeComposerControlName()
+    {
+        return tc('PageTypeComposerControlName', 'Public Date/Time');
     }
 
     public function publishToPage(Page $c, $data, $controls)
@@ -24,7 +28,8 @@ class DateTimeCorePageProperty extends CorePageProperty
         $e = Loader::helper('validation/error');
         $date = $this->getPageTypeComposerControlDraftValue();
         if (!strtotime($date)) {
-            $e->add(t('You must specify a valid date/time for this page.'));
+            $control = $this->getPageTypeComposerFormLayoutSetControlObject();
+            $e->add(t('You haven\'t chosen a valid %s', $control->getPageTypeComposerControlDisplayLabel()));
 
             return $e;
         }

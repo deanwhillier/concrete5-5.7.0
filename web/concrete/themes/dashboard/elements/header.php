@@ -1,16 +1,26 @@
-<? defined('C5_EXECUTE') or die("Access Denied.");
-if ($_GET['_ccm_dashboard_external']) {
-        return;
+<?php defined('C5_EXECUTE') or die('Access Denied.');
+
+if (Request::getInstance()->get('_ccm_dashboard_external')) {
+    return;
 }
-$html = Loader::helper('html');
+$html = Core::make('helper/html');
+/** @var Concrete\Core\Html\Service\Html $html */
+
+$valt = Core::make('helper/validation/token');
+/** @var Concrete\Core\Validation\CSRF\Token $valt */
+
+if (!isset($hideDashboardPanel)) {
+    $hideDashboardPanel = false;
+}
+
 ?><!DOCTYPE html>
-<html <? if (!$hideDashboardPanel) { ?>class="ccm-panel-open ccm-panel-right"<? } ?>>
+<html<?= $hideDashboardPanel ? '' : ' class="ccm-panel-open ccm-panel-right"'; ?>>
 <head>
     <link rel="stylesheet" type="text/css" href="<?=$this->getThemePath()?>/main.css" />
-<?
-$v = View::getInstance();
+<?php
+$v = View::getRequestInstance();
 $v->requireAsset('dashboard');
-$v->addFooterItem('<script type="text/javascript" src="' . REL_DIR_FILES_TOOLS_REQUIRED . '/i18n_js"></script>');
+$v->requireAsset('javascript-localized', 'core/localization');
 $v->addFooterItem('<script type="text/javascript">$(function() { ConcreteToolbar.start(); });</script>');
 if (Config::get('concrete.misc.enable_progressive_page_reindex') && Config::get('concrete.misc.do_page_reindex_check')) {
     $v->addFooterItem('<script type="text/javascript">$(function() { ccm_doPageReindexing(); });</script>');
@@ -19,11 +29,8 @@ if (Localization::activeLanguage() != 'en') {
     $v->addFooterItem($html->javascript('i18n/ui.datepicker-'.Localization::activeLanguage().'.js'));
 }
 
-$valt = Loader::helper('validation/token');
-//require(DIR_FILES_ELEMENTS_CORE . '/header_required.php');
 $v->addHeaderItem('<meta name="viewport" content="width=device-width, initial-scale=1">');
-$v->addHeaderItem($disp);
-Loader::element('header_required', array('disableTrackingCode' => true));
+View::element('header_required', array('disableTrackingCode' => true));
 $v->addFooterItem('<script type="text/javascript">$(function() { ConcreteDashboard.start(); });</script>');
 
 $u = new User();
@@ -59,6 +66,9 @@ $large_font = !!Config::get('concrete.accessibility.toolbar_large_font');
                         <li class="last-li"><a href="<?=View::url('/dashboard/system') ?>"><?php echo t('System & Settings'); ?></a></li>
                     </ul>
                 </li>
+                <li>
+                    <i class="fa fa-sign-out mobile-leading-icon"></i><a href="<?= URL::to('/login', 'logout', $valt->generate('logout')); ?>"><?= t('Sign Out'); ?></a>
+                </li>
             </ul>
         </div>
     </div>
@@ -75,7 +85,8 @@ $large_font = !!Config::get('concrete.accessibility.toolbar_large_font');
         </li>
         <li class="pull-right hidden-xs hidden-sm">
             <a href="<?=URL::to('/dashboard')?>"
-                data-launch-panel="dashboard" <? if (!$hideDashboardPanel) { ?>class="ccm-launch-panel-active" <? } ?>
+                data-launch-panel="dashboard"
+                <?= $hideDashboardPanel ? '' : ' class="ccm-launch-panel-active"' ?>
                 data-panel-url="<?=URL::to('/system/panels/dashboard')?>">
                 <i class="fa fa-sliders"></i>
                 <span class="ccm-toolbar-accessibility-title ccm-toolbar-accessibility-title-site-settings">
@@ -87,7 +98,7 @@ $large_font = !!Config::get('concrete.accessibility.toolbar_large_font');
             <a href="#" data-panel-url="<?=URL::to('/system/panels/sitemap')?>" data-launch-panel="sitemap">
                 <i class="fa fa-files-o"></i>
                 <span class="ccm-toolbar-accessibility-title ccm-toolbar-accessibility-title-add-page">
-                    <?= tc('toolbar', 'Add Page') ?>
+                    <?= tc('toolbar', 'Pages') ?>
                 </span>
             </a>
         </li>
@@ -100,31 +111,37 @@ $large_font = !!Config::get('concrete.accessibility.toolbar_large_font');
         </li>
     </ul>
 </div>
-<?
-$dh = Loader::helper('concrete/dashboard');
-print $dh->getIntelligentSearchMenu();
+<?php
+$dh = Core::make('helper/concrete/dashboard');
+echo $dh->getIntelligentSearchMenu();
 
-if (!$hideDashboardPanel) { ?>
-
-<div id="ccm-panel-dashboard" class="hidden-xs hidden-sm ccm-panel ccm-panel-right ccm-panel-transition-slide ccm-panel-active ccm-panel-loaded">
-    <div class="ccm-panel-content-wrapper ccm-ui">
-        <div class="ccm-panel-content ccm-panel-content-visible">
-<?
-$cnt = new \Concrete\Controller\Panel\Dashboard();
-$cnt->setPageObject($c);
-$cnt->view();
-$nav = $cnt->get('nav');
-$tab = $cnt->get('tab');
-$ui = $cnt->get('ui');
-Loader::element('panels/dashboard', array(
-    'nav' => $nav,
-    'tab' => $tab,
-    'ui' => $ui,
-    'c' => $c
-)); ?>
-</div></div>
-</div>
-
-<? } ?>
+if (!$hideDashboardPanel) {
+    ?>
+    <div id="ccm-panel-dashboard" class="hidden-xs hidden-sm ccm-panel ccm-panel-right ccm-panel-transition-slide ccm-panel-active ccm-panel-loaded">
+        <div class="ccm-panel-content-wrapper ccm-ui">
+            <div class="ccm-panel-content ccm-panel-content-visible">
+                <?php
+                $cnt = new \Concrete\Controller\Panel\Dashboard();
+                $cnt->setPageObject($c);
+                $cnt->view();
+                $nav = $cnt->get('nav');
+                $tab = $cnt->get('tab');
+                $ui = $cnt->get('ui');
+                View::element(
+                    'panels/dashboard',
+                    array(
+                        'nav' => $nav,
+                        'tab' => $tab,
+                        'ui' => $ui,
+                        'c' => $c,
+                    )
+                );
+                ?>
+            </div>
+        </div>
+    </div>
+    <?php 
+}
+?>
 
 <div id="ccm-dashboard-content" class="container-fluid">

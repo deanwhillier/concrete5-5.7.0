@@ -39,6 +39,7 @@ if (!is_object($cn)) {
 			} else {
 				$author->setEmail($_POST['cnvMessageAuthorEmail']);
 			}
+            $author->setWebsite($_POST['cnvMessageAuthorWebsite']);
 
 			$captcha = Core::make('captcha');
 			if (!$captcha->check()) {
@@ -87,7 +88,7 @@ if (Loader::helper('validation/numbers')->integer($_POST['cnvMessageParentID']) 
 	}
 }
 
-if (Config::get('conversation.banned_words') && Loader::helper('validation/banned_words')->hasBannedWords($_POST['cnvMessageBody'])) {
+if (Config::get('conversations.banned_words') && Loader::helper('validation/banned_words')->hasBannedWords($_POST['cnvMessageBody'])) {
 	$ve->add(t('Banned words detected.'));
 }
 

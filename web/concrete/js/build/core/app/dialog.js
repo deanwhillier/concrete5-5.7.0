@@ -1,8 +1,13 @@
 /**
  * concrete5 wrapper for jQuery UI
  */
+$.widget("concrete.dialog", $.ui.dialog, {
+    _allowInteraction: function(event) {
+        return !!$( event.target).closest('.ccm-interaction-dialog').length || this._super(event);
+    }
+});
 
-$.widget.bridge( "jqdialog", $.ui.dialog );
+$.widget.bridge( "jqdialog", $.concrete.dialog );
 // wrap our old dialog function in the new dialog() function.
 jQuery.fn.dialog = function() {
     // Pass this over to jQuery UI Dialog in a few circumstances
@@ -127,7 +132,7 @@ jQuery.fn.dialog.open = function(options) {
 
             jQuery.fn.dialog.activateDialogContents($dialog);
 
-            // on some brother (eg: Chrome) the resizable get hidden because the button pane 
+            // on some brother (eg: Chrome) the resizable get hidden because the button pane
             // in on top of it, here is a fix for this:
             if ( $dialog.jqdialog('option', 'resizable') )
             {
@@ -158,7 +163,7 @@ jQuery.fn.dialog.open = function(options) {
             }
             if (typeof options.onClose != "undefined") {
                 if ((typeof options.onClose) == 'function') {
-                    options.onClose();
+                    options.onClose($(this));
                 } else {
                     eval(options.onClose);
                 }

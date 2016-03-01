@@ -3,7 +3,7 @@
 class UpdateTest extends ConcreteDatabaseTestCase {
 
     protected $fixtures = array();
-    protected $tables = array('Logs', 'BlockTypes', 'CollectionVersionBlocks', 'Widgets', 'Blocks', 'SystemDatabaseMigrations', 'Files');
+    protected $tables = array('Blocks', 'BlockTypes', 'CollectionVersionBlocks', 'Files', 'Logs', 'SystemDatabaseMigrations', 'Widgets');
 
     public function testCurrentMigration()
     {
@@ -15,7 +15,7 @@ class UpdateTest extends ConcreteDatabaseTestCase {
         $version = $configuration->getCurrentVersion();
         $this->assertEquals('0', $version);
 
-        $version = $configuration->getVersion(20140908071333);
+        $version = $configuration->getVersion('20140908071333');
         $this->assertInstanceOf('\Doctrine\DBAL\Migrations\Version', $version);
         $version->markMigrated();
 

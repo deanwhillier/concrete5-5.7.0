@@ -16,9 +16,12 @@ defined('C5_EXECUTE') or die("Access Denied.");
 		<td><span class="ccm-panel-page-versions-version-id"><%-cvID%></span></td>
 		<td class="ccm-panel-page-versions-details">
 			<p><span class="ccm-panel-page-versions-version-timestamp"><%-cvDateVersionCreated%></span></p>
-			<p><%-cvAuthorUserName%></p>
+			<p><?=t('Edit by')?> <%-cvAuthorUserName%></p>
 			<% if (cvComments) { %>
 				<p><small><%-cvComments%></small></p>
+			<% } %>
+			<% if (cvIsApproved == 1) { %>
+				<p><?=t('Approved by')?> <%-cvApproverUserName%></p>
 			<% } %>
 		</td>
 		<td>
@@ -32,7 +35,9 @@ defined('C5_EXECUTE') or die("Access Denied.");
 					<li><% if (cvIsApproved == 1) { %><span><?=t('Approve')?></span><% } else { %><a href="#" data-version-menu-task="approve" data-version-id="<%-cvID%>"><?=t('Approve')?></a><% } %></li>
 					<li><a href="#" data-version-menu-task="duplicate" data-version-id="<%-cvID%>"><?=t('Duplicate')?></a></li>
 					<li class="divider"></li>
+					<% if ( ! cIsStack) { %>
 					<li><a href="#" data-version-menu-task="new-page" data-version-id="<%-cvID%>"><?=t('New Page')?></a></li>
+					<% } %>
 					<% if (cpCanDeletePageVersions) { %>
 						<li><% if (cvIsApproved == 1) { %><span><?=t('Delete')?></span><% } else { %><a href="#" data-version-menu-task="delete" data-version-id="<%-cvID%>"><?=t('Delete')?></a><% } %></li>
 					<% } %>
@@ -121,7 +126,7 @@ var ConcretePageVersionList = {
 			$.each(checkboxes, function(i, cb) {
 				data += '&cvID[]=' + $(cb).val();
 			});
-			panel.openPanelDetail({'identifier': 'page-versions', 'data': data, 'url': src});
+			panel.openPanelDetail({'identifier': 'page-versions', 'data': data, 'url': src, target: null});
 
 		} else {
 			panel.closePanelDetail();

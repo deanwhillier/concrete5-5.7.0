@@ -340,10 +340,10 @@
                 </attributekey>
             </attributes>
         </page>
-        <page name="Workflow List" path="/dashboard/workflow/workflows" filename="/dashboard/workflow/workflows.php"
-              pagetype="" description="" package="" />
         <page name="Waiting for Me" path="/dashboard/workflow/me" filename="/dashboard/workflow/me.php" pagetype=""
               description="" package="" />
+        <page name="Workflow List" path="/dashboard/workflow/workflows" filename="/dashboard/workflow/workflows.php"
+              pagetype="" description="" package="" />
         <page name="Stacks &amp; Blocks" path="/dashboard/blocks" filename="/dashboard/blocks/view.php" pagetype=""
               description="Manage sitewide content and administer block types." package=""/>
         <page name="Stacks" path="/dashboard/blocks/stacks" filename="/dashboard/blocks/stacks/view.php" pagetype=""
@@ -525,6 +525,8 @@
         </page>
         <page name="Multilingual Setup" path="/dashboard/system/multilingual/setup" filename="/dashboard/system/multilingual/setup.php" pagetype=""
               description="" package="" />
+        <page name="Copy Languages" path="/dashboard/system/multilingual/copy" filename="/dashboard/system/multilingual/copy.php" pagetype=""
+              description="" package="" />
         <page name="Page Report" path="/dashboard/system/multilingual/page_report" filename="/dashboard/system/multilingual/page_report.php" pagetype=""
               description="" package="" />
         <page name="Translate Site Interface" path="/dashboard/system/multilingual/translate_interface" filename="/dashboard/system/multilingual/translate_interface.php" pagetype=""
@@ -543,11 +545,11 @@
 
         <page name="SEO &amp; Statistics" path="/dashboard/system/seo" filename="/dashboard/system/seo/view.php"
               pagetype="" description="Enable pretty URLs and tracking codes." package=""/>
-        <page name="Pretty URLs" path="/dashboard/system/seo/urls" filename="/dashboard/system/seo/urls.php" pagetype=""
+        <page name="URLs and Redirection" path="/dashboard/system/seo/urls" filename="/dashboard/system/seo/urls.php" pagetype=""
               description="" package="">
             <attributes>
                 <attributekey handle="meta_keywords">
-                    <value>vanity, pretty url, seo, pageview, view</value>
+                    <value>vanity, pretty url, redirection, hostname, canonical, seo, pageview, view</value>
                 </attributekey>
             </attributes>
         </page>
@@ -616,6 +618,14 @@
             <attributes>
                 <attributekey handle="meta_keywords">
                     <value>images, picture, responsive, retina</value>
+                </attributekey>
+            </attributes>
+        </page>
+        <page name="Image Uploading" path="/dashboard/system/files/image_uploading"
+              filename="/dashboard/system/files/image_uploading.php" pagetype="" description="" package="">
+            <attributes>
+                <attributekey handle="meta_keywords">
+                    <value>uploading, upload, images, image, resizing, manager</value>
                 </attributekey>
             </attributes>
         </page>
@@ -909,7 +919,7 @@
               description="" package="">
             <attributes>
                 <attributekey handle="meta_keywords">
-                    <value>database, entities, doctrine</value>
+                    <value>database, entities, doctrine, orm</value>
                 </attributekey>
             </attributes>
         </page>
@@ -935,6 +945,7 @@
     </singlepages>
     <pagetypes>
         <pagetype handle="core_stack" name="Stack" internal="1" package=""/>
+        <pagetype handle="core_stack_category" name="Stack Category" internal="1" package=""/>
         <pagetype handle="dashboard_primary_five" name="Dashboard Primary + Five" internal="1" package=""/>
         <pagetype handle="dashboard_header_four_col" name="Dashboard Header + Four Column" internal="1" package=""/>
         <pagetype handle="dashboard_full" name="Dashboard Full" internal="1" package=""/>

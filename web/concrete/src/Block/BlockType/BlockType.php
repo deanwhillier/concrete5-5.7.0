@@ -87,7 +87,7 @@ class BlockType
      */
     public static function getByHandle($btHandle)
     {
-        $em = DB::get()->getEntityManager();
+        $em = \ORM::entityManager('core');
         $bt = $em->getRepository('\Concrete\Core\Block\BlockType\BlockType')->findOneBy(array('btHandle' => $btHandle));
         if (is_object($bt)) {
             $bt->loadController();
@@ -103,15 +103,14 @@ class BlockType
         $db = DB::get();
         $r = $db->MetaTables();
 
-        if (in_array('Config', $r)) {
+        if (in_array('config', array_map('strtolower', $r))) {
 
-            if(in_array('btCachedBlockRecord', $db->MetaColumnNames('Blocks'))) {
+            if (in_array('btcachedblockrecord', array_map('strtolower', $db->MetaColumnNames('Blocks')))) {
                 $db->Execute('update Blocks set btCachedBlockRecord = null');
             }
-            if (in_array('CollectionVersionBlocksOutputCache', $r)) {
+            if (in_array('collectionversionblocksoutputcache', array_map('strtolower', $r))) {
                 $db->Execute('truncate table CollectionVersionBlocksOutputCache');
             }
-
         }
     }
 
@@ -122,7 +121,7 @@ class BlockType
      */
     public static function getByID($btID)
     {
-        $em = DB::get()->getEntityManager();
+        $em = \ORM::entityManager('core');
         $bt = $em->getRepository('\Concrete\Core\Block\BlockType\BlockType')->find($btID);
         $bt->loadController();
         return $bt;
@@ -149,7 +148,7 @@ class BlockType
         }
         $class = static::getBlockTypeMappedClass($btHandle, $pkgHandle);
         $bta = new $class;
-        $path = dirname($env->getPath(DIRNAME_BLOCKS . '/' . $btHandle . '/' . FILENAME_CONTROLLER, $pkgHandle));
+        $path = dirname($env->getPath(DIRNAME_BLOCKS . '/' . $btHandle . '/' . FILENAME_BLOCK_DB, $pkgHandle));
 
         //Attempt to run the subclass methods (install schema from db.xml, etc.)
         $r = $bta->install($path);
@@ -173,7 +172,7 @@ class BlockType
             Localization::changeLocale($currentLocale);
         }
 
-        $em = DB::get()->getEntityManager();
+        $em = \ORM::entityManager('core');
         $em->persist($bt);
         $em->flush();
 
@@ -205,9 +204,9 @@ class BlockType
         $class = core_class('Block\\' . $txt->camelcase($btHandle) . '\\Controller', $prefix);
         return $class;
     }
-    
+
     /**
-     * Sets the Ignore Page Theme Gride Framework Container 
+     * Sets the Ignore Page Theme Gride Framework Container
      */
     public function setBlockTypeIgnorePageThemeGridFrameworkContainer($btIgnorePageThemeGridFrameworkContainer)
     {
@@ -267,6 +266,14 @@ class BlockType
         $dir = DIR_FILES_BLOCK_TYPES . "/{$btHandle}/" . DIRNAME_BLOCK_TEMPLATES_COMPOSER;
         if (is_dir($dir)) {
             $files = array_merge($files, $fh->getDirectoryContents($dir));
+        }
+        foreach (PackageList::get()->getPackages() as $pkg) {
+            $dir =
+                (is_dir(DIR_PACKAGES . '/' . $pkg->getPackageHandle()) ? DIR_PACKAGES : DIR_PACKAGES_CORE)
+                . '/' . $pkg->getPackageHandle() . '/' . DIRNAME_BLOCKS . '/' . $btHandle . '/' . DIRNAME_BLOCK_TEMPLATES_COMPOSER;
+            if (is_dir($dir)) {
+                $files = array_merge($files, $fh->getDirectoryContents($dir));
+            }
         }
         $dir = DIR_FILES_BLOCK_TYPES_CORE . "/{$btHandle}/" . DIRNAME_BLOCK_TEMPLATES_COMPOSER;
         if (file_exists($dir)) {
@@ -594,7 +601,7 @@ class BlockType
 
         $this->loadFromController($bta);
 
-        $em = $db->getEntityManager();
+        $em = \ORM::entityManager('core');
         $em->persist($this);
         $em->flush();
 
@@ -636,8 +643,17 @@ class BlockType
     {
         $db = Loader::db();
         $r = $db->Execute(
-                'select cID, cvID, b.bID, arHandle from CollectionVersionBlocks cvb inner join Blocks b on b.bID = cvb.bID where btID = ?',
-                array($this->getBlockTypeID()));
+                'select cID, cvID, b.bID, arHandle
+                from CollectionVersionBlocks cvb
+                    inner join Blocks b on b.bID  = cvb.bID
+                where btID = ?
+                union
+                select cID, cvID, cvb.bID, arHandle
+                from CollectionVersionBlocks cvb
+                    inner join btCoreScrapbookDisplay btCSD on cvb.bID = btCSD.bID
+                    inner join Blocks b on b.bID = btCSD.bOriginalID
+                where btID = ?',
+                array($this->getBlockTypeID(), $this->getBlockTypeID()));
         while ($row = $r->FetchRow()) {
             $nc = Page::getByID($row['cID'], $row['cvID']);
             if (!is_object($nc) || $nc->isError()) {
@@ -649,7 +665,7 @@ class BlockType
             }
         }
 
-        $em = $db->getEntityManager();
+        $em = \ORM::entityManager('core');
         $em->remove($this);
         $em->flush();
 

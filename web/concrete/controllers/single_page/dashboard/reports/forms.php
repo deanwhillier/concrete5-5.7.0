@@ -38,6 +38,9 @@ class Forms extends DashboardPageController
         $questions = $this->get('questions');
         $surveys = $this->get('surveys');
 
+        $escapeCharacter = "'";
+        $charactersToEscape = array('-', '+', '=');
+
         $fileName = $textHelper->filterNonAlphaNum($surveys[$questionSet]['surveyName']);
 
         header("Content-Type: text/csv");
@@ -92,17 +95,25 @@ class Forms extends DashboardPageController
                             $row[] = '';
                         }
                     }
-                } else if ($question['inputType'] == 'fileupload') {
-                    $fID = intval($answerSet['answers'][$questionId]['answer']);
-                    $file = File::getByID($fID);
-                    if ($fID && $file) {
-                        $fileVersion = $file->getApprovedVersion();
-                        $row[] = $fileVersion->getDownloadURL();
-                    } else {
-                        $row[] = t('File not found');
-                    }
                 } else {
-                    $row[] = $answerSet['answers'][$questionId]['answer'] . $answerSet['answers'][$questionId]['answerLong'];
+                    if ($question['inputType'] == 'fileupload') {
+                        $fID = intval($answerSet['answers'][$questionId]['answer']);
+                        $file = File::getByID($fID);
+                        if ($fID && $file) {
+                            $fileVersion = $file->getApprovedVersion();
+                            $row[] = $fileVersion->getDownloadURL();
+                        } else {
+                            $row[] = t('File not found');
+                        }
+                    } else {
+                        $answer = $answerSet['answers'][$questionId]['answer'] . $answerSet['answers'][$questionId]['answerLong'];
+
+                        if (in_array(substr($answer, 0, 1), $charactersToEscape)) {
+                            $row[] = $escapeCharacter . $answer;
+                        } else {
+                            $row[] = $answer;
+                        }
+                    }
                 }
             }
 
@@ -118,7 +129,7 @@ class Forms extends DashboardPageController
         $c = Page::getCurrentPage();
         $db = Loader::db();
         $tempMiniSurvey = new MiniSurvey();
-        $pageBase = DIR_REL . '/' . DISPATCHER_FILENAME . '?cID=' . $c->getCollectionID();
+        $pageBase = \URL::to($c);
 
         if ($_REQUEST['action'] == 'deleteForm') {
             if (!Loader::helper('validation/token')->validate('deleteForm')) {
@@ -172,11 +183,12 @@ class Forms extends DashboardPageController
             $answerSetCount = MiniSurvey::getAnswerCount($questionSet);
 
             //pagination 
-            $pageBaseSurvey = $pageBase . '&qsid=' . $questionSet;
+            $pageBaseSurvey = $pageBase . '?qsid=' . $questionSet;
             $paginator = Loader::helper('pagination');
             $sortBy = $_REQUEST['sortBy'];
             $paginator->init(
-                    (int) $_REQUEST['page'], $answerSetCount, $pageBaseSurvey . '&page=%pageNum%&sortBy=' . $sortBy, $this->pageSize
+                (int)$_REQUEST['page'], $answerSetCount, $pageBaseSurvey . '&page=%pageNum%&sortBy=' . $sortBy,
+                $this->pageSize
             );
 
             if ($this->pageSize > 0) {

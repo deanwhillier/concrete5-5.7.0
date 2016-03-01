@@ -1,6 +1,7 @@
 <?php
 namespace Concrete\Core\Database;
 
+use Doctrine\Common\Persistence\Mapping\MappingException;
 use Doctrine\DBAL\Schema\SchemaDiff;
 use Doctrine\ORM\EntityManager;
 use Core;
@@ -288,30 +289,33 @@ class DatabaseStructureManager
      * Drops all the database tables that
      * a) are prefixed with the given prefix string
      * b) are not linked to any existing entity managed by this class
+     * c) are not contained within the $excludeTables array
      * 
      * Can be used e.g. for packages by giving the package's handle in
      * camelcased format. This would drop all the prefixed database tables
      * for that package that no longer have a corresponding entity defined
-     * for them.
+     * for them. Give the tables defined in the package's DB XML in the
+     * $excludeTables array in order not to drop them.
      * 
      * @param  string $prefix
+     * @param  array $excludeTables
      * @return int
      */
-    public function dropObsoleteDatabaseTables($prefix)
+    public function dropObsoleteDatabaseTables($prefix, array $excludeTables = array())
     {
         $em = $this->getEntityManager();
         $conn = $em->getConnection();
         $sm = $conn->getSchemaManager();
         $cmf = $em->getMetadataFactory();
-        $existing = array();
+        // Exclude existing entity tables from being dropped
         $metadatas = $this->getMetadatas();
         foreach ($metadatas as $md) {
-            $existing[] = $md->getTableName();
+            $excludeTables[] = $md->getTableName();
         }
         $fromSchema = $sm->createSchema();
         $toSchema = clone $fromSchema;
         foreach ($fromSchema->getTables() as $tbl) {
-            if (strpos($tbl->getName(), $prefix) === 0 && !in_array($tbl->getName(), $existing)) {
+            if (strpos($tbl->getName(), $prefix) === 0 && !in_array($tbl->getName(), $excludeTables)) {
                 $toSchema->dropTable($tbl->getName());
             }
         }
@@ -360,7 +364,7 @@ class DatabaseStructureManager
             foreach ($cmf->getAllMetadata() as $metaData) {
                 $this->metadatas[$metaData->getName()] = $metaData;
             }
-        } catch (\Exception $e) {
+        } catch (MappingException $e) {
             // we don't want them complaining about a src directory not being in the package.
         }
     }

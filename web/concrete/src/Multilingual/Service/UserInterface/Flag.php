@@ -14,13 +14,24 @@ class Flag
      */
     public function getFlagIcon($region, $filePathOnly = false)
     {
-        if ($region) {
-            $region = strtolower($region);
+        $val = \Core::make('helper/validation/strings');
+        if ($val->alphanum($region, false, true)) {
+            $region = h(strtolower($region));
+        } else {
+            $region = false;
+        }
 
-            if (file_exists(
-                DIR_BASE . '/' . DIRNAME_IMAGES . '/' . DIRNAME_IMAGES_LANGUAGES . '/' . $region . '.png'
+        if ($region) {
+            $v = \View::getInstance();
+            
+            if ($v->getThemeDirectory() != '' && file_exists(
+                $v->getThemeDirectory() . '/' . DIRNAME_IMAGES . '/' . DIRNAME_IMAGES_LANGUAGES . '/' . $region . '.png'
+			)) {
+                $icon = $v->getThemePath() . '/' . DIRNAME_IMAGES . '/' . DIRNAME_IMAGES_LANGUAGES . '/' . $region . '.png';
+            } elseif (file_exists(
+                DIR_APPLICATION . '/' . DIRNAME_IMAGES . '/' . DIRNAME_IMAGES_LANGUAGES . '/' . $region . '.png'
             )) {
-                $icon = DIR_REL . '/' . DIRNAME_IMAGES . '/' . DIRNAME_IMAGES_LANGUAGES . '/' . $region . '.png';
+                $icon = REL_DIR_APPLICATION . '/' . DIRNAME_IMAGES . '/' . DIRNAME_IMAGES_LANGUAGES . '/' . $region . '.png';
             } else {
                 $icon = ASSETS_URL . '/' . DIRNAME_IMAGES . '/' . DIRNAME_IMAGES_LANGUAGES . '/' . $region . '.png';
             }
@@ -29,7 +40,7 @@ class Flag
                 if ($filePathOnly) {
                     return $icon;
                 } else {
-                    return '<img class="ccm-region-flag img-reponsive" id="ccm-region-flag-' . $region . '" src="' . $icon . '" alt="' . $region . '" />';
+                    return '<img class="ccm-region-flag" id="ccm-region-flag-' . $region . '" src="' . $icon . '" alt="' . $region . '" />';
                 }
             }
         }
@@ -42,8 +53,14 @@ class Flag
         return self::getFlagIcon($icon, $filePathOnly);
     }
 
-    public function getDashboardSitemapIconSRC($page)
+    public static function getDashboardSitemapIconSRC($page)
     {
+        if ($page->getPageTypeHandle() == STACK_CATEGORY_PAGE_TYPE) {
+            $section = Section::getByLocale($page->getCollectionName());
+            if (is_object($section)) {
+                return self::getSectionFlagIcon($section, true);
+            }
+        }
         $ids = Section::getIDList();
         if (in_array($page->getCollectionID(), $ids)) {
             return self::getSectionFlagIcon($page, true);

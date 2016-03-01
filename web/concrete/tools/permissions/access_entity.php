@@ -32,7 +32,7 @@ if ($_POST['task'] == 'save_permissions') {
 	$r = new stdClass;
 
 	if (is_object($pae)) {
-		$pd = PermissionDuration::translateFromRequest();
+		$pd = PermissionDuration::createFromRequest();
 	} else {
 		$r->error = true;
 		$r->message = t('You must choose who this permission is for.');
@@ -130,7 +130,7 @@ if ($_POST['task'] == 'save_permissions') {
 				ConcreteAlert.dialog('<?=t("Error")?>', r.message);
 			} else {
 				if (typeof(ccm_addAccessEntity) == 'function') {
-					ccm_addAccessEntity(r.peID, r.pdID, '<?=addslashes($_REQUEST["accessType"])?>');
+					ccm_addAccessEntity(r.peID, r.pdID, '<?=addslashes(h($_REQUEST["accessType"]))?>');
 				} else {
 					alert(r.peID);
 					alert(r.pdID);

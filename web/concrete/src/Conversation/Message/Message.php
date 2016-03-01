@@ -14,6 +14,7 @@ use \Concrete\Core\Foundation\Object;
 use User;
 use UserInfo;
 use Concrete\Core\Utility\IPAddress;
+use Events;
 
 class Message extends Object implements \Concrete\Core\Permission\ObjectInterface
 {
@@ -314,6 +315,7 @@ class Message extends Object implements \Concrete\Core\Permission\ObjectInterfac
             } else {
                 $author->setName($r['cnvMessageAuthorName']);
                 $author->setEmail($r['cnvMessageAuthorEmail']);
+                $author->setWebsite($r['cnvMessageAuthorWebsite']);
             }
             $msg->cnvMessageAuthor = $author;
             return $msg;
@@ -330,8 +332,8 @@ class Message extends Object implements \Concrete\Core\Permission\ObjectInterfac
                 $this->getConversationMessageID(),
                 $f->getFileID()
             ));
-            $fs = FileSet::createAndGetSet(Config::get('concrete.conversations.attachments_file_set'), FileSet::TYPE_PUBLIC, USER_SUPER_ID);
-            $fsToRemove = FileSet::createAndGetSet(Config::get('concrete.conversations.attachments_pending_file_set'), FileSet::TYPE_PUBLIC, USER_SUPER_ID);
+            $fs = FileSet::createAndGetSet(Config::get('conversations.attachments_file_set'), FileSet::TYPE_PUBLIC, USER_SUPER_ID);
+            $fsToRemove = FileSet::createAndGetSet(Config::get('conversations.attachments_pending_file_set'), FileSet::TYPE_PUBLIC, USER_SUPER_ID);
             $fs->addFileToSet($f);
             $fsToRemove->removeFileFromSet($f);
         }
@@ -379,6 +381,7 @@ class Message extends Object implements \Concrete\Core\Permission\ObjectInterfac
         $user = $author->getUser();
         $cnvMessageAuthorName = $author->getName();
         $cnvMessageAuthorEmail = $author->getEmail();
+        $cnvMessageAuthorWebsite = $author->getWebsite();
 
         if (is_object($user)) {
             $uID = $user->getUserID();
@@ -402,24 +405,29 @@ class Message extends Object implements \Concrete\Core\Permission\ObjectInterfac
         /** @var \Concrete\Core\Permission\IPService $iph */
         $iph = Core::make('helper/validation/ip');
         $ip = $iph->getRequestIP();
-        $r = $db->Execute('insert into ConversationMessages (cnvMessageSubject, cnvMessageBody, cnvMessageDateCreated, cnvMessageParentID, cnvEditorID, cnvMessageLevel, cnvID, uID, cnvMessageAuthorName, cnvMessageAuthorEmail, cnvMessageSubmitIP, cnvMessageSubmitUserAgent) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-                          array($cnvMessageSubject, $cnvMessageBody, $date, $cnvMessageParentID, $cnvEditorID, $cnvMessageLevel, $cnvID, $uID, $cnvMessageAuthorName, $cnvMessageAuthorEmail, ($ip === false)?(''):($ip->getIp()), $_SERVER['HTTP_USER_AGENT']));
+        $r = $db->Execute('insert into ConversationMessages (cnvMessageSubject, cnvMessageBody, cnvMessageDateCreated, cnvMessageParentID, cnvEditorID, cnvMessageLevel, cnvID, uID, cnvMessageAuthorName, cnvMessageAuthorEmail, cnvMessageAuthorWebsite, cnvMessageSubmitIP, cnvMessageSubmitUserAgent) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                          array($cnvMessageSubject, $cnvMessageBody, $date, $cnvMessageParentID, $cnvEditorID, $cnvMessageLevel, $cnvID, $uID, $cnvMessageAuthorName, $cnvMessageAuthorEmail, $cnvMessageAuthorWebsite, ($ip === false)?(''):($ip->getIp()), $_SERVER['HTTP_USER_AGENT']));
 
         $cnvMessageID = $db->Insert_ID();
+        
+        $message = static::getByID($cnvMessageID);
+
+        $event = new MessageEvent($message);
+        Events::dispatch('on_new_conversation_message', $event);
 
         if ($cnv instanceof \Concrete\Core\Conversation\Conversation) {
             $cnv->updateConversationSummary();
-            if ($cnv->getConversationNotificationEnabled()) {
-                $c = $cnv->getConversationPageObject();
-                if (is_object($c)) {
-                    $formatter = new AuthorFormatter($author);
-                    $email = $cnv->getConversationNotificationEmailAddress();
+            $users = $cnv->getConversationUsersToEmail();
+            $c = $cnv->getConversationPageObject();
+            if (is_object($c)) {
+                $formatter = new AuthorFormatter($author);
+                $cnvMessageBody = html_entity_decode($cnvMessageBody, ENT_QUOTES, APP_CHARSET);
+                foreach($users as $ui) {
                     $mail = Core::make('mail');
-                    $mail->to($email);
+                    $mail->to($ui->getUserEmail());
                     $mail->addParameter('title', $c->getCollectionName());
                     $mail->addParameter('link', $c->getCollectionLink(true));
                     $mail->addParameter('poster', $formatter->getDisplayName());
-                    $cnvMessageBody = html_entity_decode($cnvMessageBody, ENT_QUOTES, APP_CHARSET);
                     $mail->addParameter('body', Core::make('helper/text')->prettyStripTags($cnvMessageBody));
                     $mail->load('new_conversation_message');
                     $mail->sendMail();

@@ -1,8 +1,11 @@
 <?php
+
 namespace Concrete\Core\Routing;
 
-use \Concrete\Core\Page\Event as PageEvent;
+use Concrete\Core\Page\Event as PageEvent;
 use Concrete\Core\Page\Theme\Theme;
+use Concrete\Core\Url\Url;
+use PermissionKey;
 use Request;
 use User;
 use Events;
@@ -17,7 +20,6 @@ use Session;
 
 class DispatcherRouteCallback extends RouteCallback
 {
-
     protected function sendResponse(View $v, $code = 200)
     {
         $contents = $v->render();
@@ -46,13 +48,12 @@ class DispatcherRouteCallback extends RouteCallback
         return $this->sendResponse($v, 404);
     }
 
-    protected function sendPageForbidden(Request $request)
+    protected function sendPageForbidden(Request $request, $currentPage)
     {
         // set page for redirection after successful login
-        $currentPage = Page::getByPath($request->getPath());
-        if($currentPage){
-                Session::set('rcID', $currentPage->getCollectionID());
-        }
+        Session::set('rcID', $currentPage->getCollectionID());
+        Session::set('rUri', $request->getRequestUri());
+
         // load page forbidden
         $item = '/page_forbidden';
         $c = Page::getByPath($item);
@@ -90,19 +91,28 @@ class DispatcherRouteCallback extends RouteCallback
                 return $this->sendPageNotFound($request);
             } else {
                 $c = $home;
+                $c->cPathFetchIsCanonical = true;
             }
         }
         if (!$c->cPathFetchIsCanonical) {
             // Handle redirect URL (additional page paths)
-            return Redirect::page($c, 301)->send();
+            /** @var Url $url */
+            $url = \Core::make('url/manager')->resolve(array($c));
+            $query = $url->getQuery();
+            $query->modify($request->getQueryString());
+
+            $url = $url->setQuery($query);
+
+            $response = Redirect::to($url);
+            $response->setStatusCode(301);
+
+            return $response;
         }
 
         // maintenance mode
-        if ((!$c->isAdminArea()) && ($c->getCollectionPath() != '/login')) {
+        if ($c->getCollectionPath() != '/login') {
             $smm = Config::get('concrete.maintenance_mode');
-            if ($smm == 1 && ($_SERVER['REQUEST_METHOD'] != 'POST' || Loader::helper('validation/token')->validate(
-                    ) == false)
-            ) {
+            if ($smm == 1 && !PermissionKey::getByHandle('view_in_maintenance_mode')->validate() && ($_SERVER['REQUEST_METHOD'] != 'POST' || Loader::helper('validation/token')->validate() == false)) {
                 $v = new View('/frontend/maintenance_mode');
                 $v->setViewTheme(VIEW_CORE_THEME);
 
@@ -111,13 +121,13 @@ class DispatcherRouteCallback extends RouteCallback
         }
 
         if ($c->getCollectionPointerExternalLink() != '') {
-            return Redirect::url($c->getCollectionPointerExternalLink(), 301)->send();
+            return Redirect::url($c->getCollectionPointerExternalLink(), 301);
         }
 
         $cp = new Permissions($c);
 
         if ($cp->isError() && $cp->getError() == COLLECTION_FORBIDDEN) {
-            return $this->sendPageForbidden($request);
+            return $this->sendPageForbidden($request, $c);
         }
 
         if (!$c->isActive() && (!$cp->canViewPageVersions())) {
@@ -137,7 +147,7 @@ class DispatcherRouteCallback extends RouteCallback
                     return $this->sendPageNotFound($request);
                     break;
                 case COLLECTION_FORBIDDEN:
-                    return $this->sendPageForbidden($request);
+                    return $this->sendPageForbidden($request, $c);
                     break;
             }
         }
@@ -145,12 +155,18 @@ class DispatcherRouteCallback extends RouteCallback
         // Now that we've passed all permissions checks, and we have a page, we check to see if we
         // ought to redirect based on base url or trailing slash settings
         $cms = \Core::make("app");
-        $cms->handleBaseURLRedirection();
-        $cms->handleURLSlashes();
+        $response = $cms->handleCanonicalURLRedirection($request);
+        if (!$response) {
+            $response = $cms->handleURLSlashes($request);
+        }
+        if (isset($response)) {
+            $response->send();
+            exit;
+        }
 
         // Now we check to see if we're on the home page, and if it multilingual is enabled,
         // and if so, whether we should redirect to the default language page.
-        if (Config::get('concrete.multilingual.enabled')) {
+        if (\Core::make('multilingual/detector')->isEnabled()) {
             $dl = Core::make('multilingual/detector');
             if ($c->getCollectionID() == HOME_CID && Config::get('concrete.multilingual.redirect_home_to_default_locale')) {
                 // Let's retrieve the default language
@@ -171,13 +187,14 @@ class DispatcherRouteCallback extends RouteCallback
         // On page view event.
         $pe = new PageEvent($c);
         $pe->setUser($u);
+        $pe->setRequest($request);
         Events::dispatch('on_page_view', $pe);
 
         $controller = $c->getPageController();
         $controller->on_start();
         $controller->setupRequestActionAndParameters($request);
         $response = $controller->validateRequest();
-        if ($response instanceof \Concrete\Core\Http\Response) {
+        if ($response instanceof \Symfony\Component\HttpFoundation\Response) {
             return $response;
         } else {
             if ($response == false) {
@@ -186,7 +203,10 @@ class DispatcherRouteCallback extends RouteCallback
         }
         $requestTask = $controller->getRequestAction();
         $requestParameters = $controller->getRequestActionParameters();
-        $controller->runAction($requestTask, $requestParameters);
+        $response = $controller->runAction($requestTask, $requestParameters);
+        if ($response instanceof \Symfony\Component\HttpFoundation\Response) {
+            return $response;
+        }
 
         $c->setController($controller);
         $view = $controller->getViewObject();
@@ -198,6 +218,7 @@ class DispatcherRouteCallback extends RouteCallback
                 $mobileTheme = Theme::getByID(Config::get('concrete.misc.mobile_theme_id'));
                 if ($mobileTheme instanceof Theme) {
                     $view->setViewTheme($mobileTheme);
+                    $controller->setTheme($mobileTheme);
                 }
             }
         }
@@ -210,7 +231,7 @@ class DispatcherRouteCallback extends RouteCallback
 
     public static function getRouteAttributes($callback)
     {
-        $callback = new DispatcherRouteCallback($callback);
+        $callback = new self($callback);
 
         return array('callback' => $callback);
     }

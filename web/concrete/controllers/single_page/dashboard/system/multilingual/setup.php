@@ -19,7 +19,7 @@ class Setup extends DashboardPageController
     public function view()
     {
         $ll = Core::make('localization/languages');
-        $cl = Core::Make('lists/countries');
+        $cl = Core::make('lists/countries');
         $languages = $ll->getLanguageList();
 
         $this->set('pages', Section::getList());
@@ -83,10 +83,6 @@ class Setup extends DashboardPageController
         $ch = Core::make('multilingual/interface/flag');
         $msCountry = $this->post('msCountry');
 
-        if (!$msCountry) {
-            return false;
-        }
-
         $flag = $ch->getFlagIcon($msCountry);
         if ($flag) {
             $html = $flag;
@@ -107,12 +103,6 @@ class Setup extends DashboardPageController
     public function multilingual_content_updated()
     {
         $this->set('message', t('Multilingual content updated'));
-        $this->view();
-    }
-
-    public function tree_copied()
-    {
-        $this->set('message', t('Multilingual tree copied.'));
         $this->view();
     }
 

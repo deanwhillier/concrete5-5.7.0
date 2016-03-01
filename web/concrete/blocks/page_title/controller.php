@@ -1,16 +1,15 @@
 <?php
 
 namespace Concrete\Block\PageTitle;
+
 use Page;
-use \Concrete\Core\Block\BlockController;
-use Loader;
-use \Concrete\Core\Tree\Node\Type\Topic;
+use Concrete\Core\Block\BlockController;
+use Concrete\Core\Tree\Node\Type\Topic;
 
 defined('C5_EXECUTE') or die("Access Denied.");
 
 class Controller extends BlockController
 {
-
     public $helpers = array('form');
 
     protected $btInterfaceWidth = 400;
@@ -20,7 +19,6 @@ class Controller extends BlockController
     protected $btInterfaceHeight = 400;
     protected $btTable = 'btPageTitle';
     protected $btWrapperClass = 'ccm-ui';
-
 
     public function getBlockTypeDescription()
     {
@@ -37,7 +35,7 @@ class Controller extends BlockController
         return $this->getTitleText();
     }
 
-    function getTitleText()
+    public function getTitleText()
     {
         if ($this->useCustomTitle && strlen($this->titleText)) {
             $title = $this->titleText;
@@ -48,20 +46,21 @@ class Controller extends BlockController
                 if (!strlen($title) && $p->isMasterCollection()) {
                     $title = '[' . t('Page Title') . ']';
                 }
+            } else {
+                $title = '';
             }
         }
+
         return $title;
     }
 
-
     public function view()
     {
-        if (!$this->formatting) {
+        if (!(isset($this->formatting) && $this->formatting)) {
             $this->set('formatting', 'h1');
         }
         $this->set('title', $this->getTitleText());
     }
-
 
     public function save($data)
     {
@@ -69,17 +68,14 @@ class Controller extends BlockController
         parent::save($data);
     }
 
-    public function action_topic($topic = false)
+    public function action_topic($treeNodeID = false, $topic = false)
     {
-        $db = Loader::db();
-        $treeNodeID = $db->GetOne('select treeNodeID from TreeTopicNodes where treeNodeTopicName = ?', array($topic));
         if ($treeNodeID) {
             $topicObj = Topic::getByID(intval($treeNodeID));
-            $this->set('currentTopic', $topicObj);
+            if ($topicObj instanceof Topic) {
+                $this->set('currentTopic', $topicObj);
+            }
         }
         $this->view();
     }
-
 }
-
-?>

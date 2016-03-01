@@ -10,6 +10,7 @@
         var my = this;
         options = $.extend({
             'mode': 'menu',
+            'upload_token': '',
             'uploadElement': 'body',
             'bulkParameterName': 'fID'
         }, options);
@@ -26,6 +27,10 @@
         my.setupFileUploads();
         my.setupEvents();
 
+        // Remove the multiple choice option from the dashboard menu
+        if ( 'menu' === options.mode ) {
+            $('.ccm-search-bulk-action option[value="choose"]').remove();
+        }
     }
 
     ConcreteFileManager.prototype = Object.create(ConcreteAjaxSearch.prototype);
@@ -46,16 +51,24 @@
         var my = this,
             $fileUploaders = $('.ccm-file-manager-upload'),
             $fileUploader = $fileUploaders.filter('#ccm-file-manager-upload-prompt'),
+            $maxWidth = $fileUploaders.data('image-max-width'),
+            $maxHeight = $fileUploaders.data('image-max-height'),
+            $imageResize = ($maxWidth > 0 && $maxHeight>0),
+            $quality = $fileUploaders.data('image-quality'),
             errors = [],
+            files = [],
             error_template = _.template(
-                '<span><%- message %></span>' +
                 '<ul><% _(errors).each(function(error) { %>' +
                 '<li><strong><%- error.name %></strong><p><%- error.error %></p></li>' +
                 '<% }) %></ul>'),
             args = {
                 url: CCM_DISPATCHER_FILENAME + '/ccm/system/file/upload',
                 dataType: 'json',
-                formData: {'ccm_token': CCM_SECURITY_TOKEN},
+                formData: {'ccm_token': my.options.upload_token},
+                disableImageResize: !$imageResize,
+                imageQuality: ($quality > 0 ? $quality : 85),
+                imageMaxWidth:($maxWidth > 0 ? $maxWidth : 1920),
+                imageMaxHeight:($maxHeight > 0 ? $maxHeight : 1080),
                 error: function(r) {
                     var message = r.responseText;
                     try {
@@ -72,46 +85,62 @@
                 },
                 start: function() {
                     errors = [];
-                    $('#ccm-file-upload-progress-wrapper').remove();
                     $('<div />', {'id': 'ccm-file-upload-progress-wrapper'}).html(my._templateFileProgress({'progress': 100})).appendTo(document.body);
                     $.fn.dialog.open({
                         title: ccmi18n_filemanager.uploadProgress,
                         width: 400,
                         height: 50,
+                        onClose: function($dialog) {
+                            $dialog.jqdialog('destroy').remove();
+                        },
                         element: $('#ccm-file-upload-progress-wrapper'),
                         modal: true
                     });
                 },
+                done: function(e, data)
+                {
+                    files.push(data.result[0]);
+                },
                 stop: function() {
                     jQuery.fn.dialog.closeTop();
-                    my.refreshResults();
 
                     if (errors.length) {
-                        ConcreteAlert.error({
-                            message: error_template({message: ccmi18n_filemanager.uploadFailed, errors: errors}),
-                            title: ccmi18n_filemanager.title,
-                            delay: 10000
-                        });
+                        ConcreteAlert.dialog(ccmi18n_filemanager.uploadFailed, error_template({errors: errors}));
                     } else {
-                        ConcreteAlert.notify({
-                            'message': ccmi18n_filemanager.uploadComplete,
-                            'title': ccmi18n_filemanager.title
+                        var canAdd = false;
+                        _.each(files, function(file) {
+                            if (file.canEditFileProperties) {
+                                canAdd = true;
+                            }
                         });
+                        if (canAdd) {
+                            my._launchUploadCompleteDialog(files);
+                        } else {
+                            my.refreshResults();
+                        }
+                        files = [];
                     }
                 }
             };
 
         $fileUploader = $fileUploader.length ? $fileUploader : $fileUploaders.first();
-        $fileUploader.on('click', function() {
-            $(this).find('input').trigger('click');
-        });
 
         $fileUploader.fileupload(args);
     };
 
+    ConcreteFileManager.prototype._launchUploadCompleteDialog = function(files) {
+        var my = this;
+        ConcreteFileManager.launchUploadCompleteDialog(files, my);
+    }
+
     ConcreteFileManager.prototype.setupEvents = function() {
         var my = this;
-        ConcreteEvent.subscribe('FileManagerUpdateRequestComplete', function(e) {
+        ConcreteEvent.unsubscribe('FileManagerAddFilesComplete');
+        ConcreteEvent.subscribe('FileManagerAddFilesComplete', function(e, data) {
+            my._launchUploadCompleteDialog(data.files);
+        });
+        ConcreteEvent.unsubscribe('FileManagerDeleteFilesComplete');
+        ConcreteEvent.subscribe('FileManagerDeleteFilesComplete', function(e, data) {
             my.refreshResults();
         });
     };
@@ -144,7 +173,8 @@
             my.$element.on('mouseout.concreteFileManagerHoverFile', 'tr[data-file-manager-file]', function() {
                 $(this).removeClass('ccm-search-select-hover');
             });
-            my.$element.unbind('.concreteFileManagerChooseFile').on('click.concreteFileManagerChooseFile', 'tr[data-file-manager-file]', function() {
+            my.$element.unbind('.concreteFileManagerChooseFile').on('click.concreteFileManagerChooseFile', 'tr[data-file-manager-file]', function(e) {
+                if ( 'checkbox' === $(e.target).prop('type') ) return;
                 ConcreteEvent.publish('FileManagerBeforeSelectFile', {fID: $(this).attr('data-file-manager-file')});
                 ConcreteEvent.publish('FileManagerSelectFile', {fID: $(this).attr('data-file-manager-file')});
                 my.$downloadTarget.remove();
@@ -159,7 +189,11 @@
             itemIDs.push({'name': 'item[]', 'value': $(checkbox).val()});
         });
 
-        if (value == 'download') {
+        if (value == 'choose') {
+            var items = itemIDs.map(function (value) { return value.value; });
+            ConcreteEvent.publish('FileManagerBeforeSelectFile', { fID: items });
+            ConcreteEvent.publish('FileManagerSelectFile', { fID: items });
+        } else if (value == 'download') {
             my.$downloadTarget.get(0).src = CCM_TOOLS_PATH + '/files/download?' + jQuery.param(itemIDs);
         } else {
             ConcreteAjaxSearch.prototype.handleSelectedBulkAction.call(this, value, type, $option, $items);
@@ -184,6 +218,7 @@
 
         var options = {
             filters: [], // filters must be an array of objects ex: [{ field: Concrete.const.Controller.Search.Files.FILTER_BY_TYPE, type: Concrete.const.Core.File.Type.Type.T_IMAGE }]
+            multipleSelection: false, // Multiple selection switch
         };
 
         $.extend(options, opts);
@@ -209,15 +244,52 @@
             modal: true,
             data: data,
             title: ccmi18n_filemanager.title,
-            onOpen: function() {
+            onOpen: function(dialog) {
                 ConcreteEvent.unsubscribe('FileManagerSelectFile');
                 ConcreteEvent.subscribe('FileManagerSelectFile', function(e, data) {
+                    var multipleItemsSelected = (Object.prototype.toString.call( data.fID ) === '[object Array]');
+                    if (options.multipleSelection && !multipleItemsSelected) {
+                        data.fID = [data.fID]; 
+                    } else if (!options.multipleSelection && multipleItemsSelected) {
+                        if (data.fID.length > 1) {
+                            $('.ccm-search-bulk-action option:first-child').prop('selected', 'selected');
+                            alert(ccmi18n_filemanager.chosenTooMany);
+                            return;
+                        }
+                        data.fID = data.fID[0];
+                    }
                     jQuery.fn.dialog.closeTop();
                     callback(data);
                 });
             }
         });
     };
+
+    ConcreteFileManager.launchUploadCompleteDialog = function(files, my) {
+        if (files && files.length && files.length > 0) {
+            var data = '';
+            _.each(files, function(file) {
+                data += 'fID[]=' + file.fID + '&';
+            });
+            data = data.substring(0, data.length - 1);
+            $.fn.dialog.open({
+                width: '660',
+                height: '500',
+                href: CCM_DISPATCHER_FILENAME + '/ccm/system/dialogs/file/upload_complete',
+                modal: true,
+                data: data,
+                onClose: function() {
+                    var data = {filemanager: my}
+                    ConcreteEvent.publish('FileManagerUploadCompleteDialogClose', data);
+                },
+                onOpen: function() {
+                    var data = {filemanager: my}
+                    ConcreteEvent.publish('FileManagerUploadCompleteDialogOpen', data);
+                },
+                title: ccmi18n_filemanager.uploadComplete
+            });
+        }
+    }
 
     ConcreteFileManager.getFileDetails = function(fID, callback) {
         $.ajax({
@@ -243,21 +315,24 @@
                 '<li><a href="#" data-file-manager-action="clear">' + ccmi18n_filemanager.clear + '</a></li>' +
                 '<li class="divider"></li>' +
                 '<% } %>' +
-                '<% if (item.canViewFile) { %>' +
+                '<% if (item.canViewFile && item.canRead) { %>' +
                     '<li><a class="dialog-launch" dialog-modal="false" dialog-append-buttons="true" dialog-width="90%" dialog-height="75%" dialog-title="' + ccmi18n_filemanager.view + '" href="' + CCM_TOOLS_PATH + '/files/view?fID=<%=item.fID%>">' + ccmi18n_filemanager.view + '</a></li>' +
                 '<% } %>' +
-                '<li><a href="#" onclick="window.frames[\'ccm-file-manager-download-target\'].location=\'' + CCM_TOOLS_PATH + '/files/download?fID=<%=item.fID%>\'; return false">' + ccmi18n_filemanager.download + '</a></li>' +
-                '<% if (item.canEditFile) { %>' +
-                    '<li><a class="dialog-launch" dialog-modal="true" dialog-width="90%" dialog-height="70%" dialog-title="' + ccmi18n_filemanager.edit + '" href="' + CCM_TOOLS_PATH + '/files/edit?fID=<%=item.fID%>">' + ccmi18n_filemanager.edit + '</a></li>' +
+                '<% if (item.canRead) { %>' +
+                    '<li><a href="#" onclick="window.frames[\'ccm-file-manager-download-target\'].location=\'' + CCM_TOOLS_PATH + '/files/download?fID=<%=item.fID%>\'; return false">' + ccmi18n_filemanager.download + '</a></li>' +
                 '<% } %>' +
-                '<li><a class="dialog-launch" dialog-modal="true" dialog-width="680" dialog-height="450" dialog-title="' + ccmi18n_filemanager.properties + '" href="' + CCM_DISPATCHER_FILENAME + '/ccm/system/dialogs/file/properties?fID=<%=item.fID%>">' + ccmi18n_filemanager.properties + '</a></li>' +
+                '<% if (item.canEditFile && item.canEditFileContents) { %>' +
+                    '<li><a class="dialog-launch" dialog-modal="true" dialog-width="90%" dialog-height="70%" dialog-title="' + ccmi18n_filemanager.edit + '" href="' + CCM_TOOLS_PATH + '/files/edit?fID=<%=item.fID%>">' + ccmi18n_filemanager.edit + '</a></li>' +
+                    '<li><a class="dialog-launch" dialog-modal="true" dialog-width="90%" dialog-height="70%" dialog-title="' + ccmi18n_filemanager.thumbnailImages + '" href="' + CCM_DISPATCHER_FILENAME + '/ccm/system/dialogs/file/thumbnails?fID=<%=item.fID%>">' + ccmi18n_filemanager.thumbnailImages + '</a></li>' +
+                '<% } %>' +
+                '<li><a class="dialog-launch" dialog-modal="true" dialog-width="850" dialog-height="450" dialog-title="' + ccmi18n_filemanager.properties + '" href="' + CCM_DISPATCHER_FILENAME + '/ccm/system/dialogs/file/properties?fID=<%=item.fID%>">' + ccmi18n_filemanager.properties + '</a></li>' +
                 '<% if (item.canReplaceFile) { %>' +
                     '<li><a class="dialog-launch" dialog-modal="true" dialog-width="500" dialog-height="200" dialog-title="' + ccmi18n_filemanager.replace + '" href="' + CCM_TOOLS_PATH + '/files/replace?fID=<%=item.fID%>">' + ccmi18n_filemanager.replace + '</a></li>' +
                 '<% } %>' +
                 '<% if (item.canCopyFile) { %>' +
                     '<li><a href="#" data-file-manager-action="duplicate">' + ccmi18n_filemanager.duplicate + '</a></li>' +
                 '<% } %>' +
-                '<li><a class="dialog-launch" dialog-modal="true" dialog-width="500" dialog-height="400" dialog-title="' + ccmi18n_filemanager.sets + '" href="' + CCM_TOOLS_PATH + '/files/add_to?fID=<%=item.fID%>">' + ccmi18n_filemanager.sets + '</a></li>' +
+                '<li><a class="dialog-launch" dialog-modal="true" dialog-width="500" dialog-height="400" dialog-title="' + ccmi18n_filemanager.sets + '" href="' + CCM_DISPATCHER_FILENAME + '/ccm/system/dialogs/file/sets?fID=<%=item.fID%>">' + ccmi18n_filemanager.sets + '</a></li>' +
                 '<% if (item.canDeleteFile || item.canEditFilePermissions) { %>' +
                     '<li class="divider"></li>' +
                 '<% } %>' +

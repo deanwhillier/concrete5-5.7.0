@@ -1,19 +1,18 @@
 <?php
 
 namespace Concrete\Block\Feature;
+
+use Concrete\Core\Editor\LinkAbstractor;
 use Page;
-use Loader;
-
-defined('C5_EXECUTE') or die("Access Denied.");
-
 use Concrete\Core\Block\BlockController;
 use Less_Parser;
 use Less_Tree_Rule;
 use Core;
 
+defined('C5_EXECUTE') or die("Access Denied.");
+
 class Controller extends BlockController
 {
-
     public $helpers = array('form');
 
     protected $btInterfaceWidth = 400;
@@ -34,14 +33,15 @@ class Controller extends BlockController
         return t("Feature");
     }
 
-    function getLinkURL()
+    public function getLinkURL()
     {
         if (!empty($this->externalLink)) {
             return $this->externalLink;
         } else {
             if (!empty($this->internalLinkCID)) {
                 $linkToC = Page::getByID($this->internalLinkCID);
-                return (empty($linkToC) || $linkToC->error) ? '' : Loader::helper('navigation')->getLinkToCollection(
+
+                return (empty($linkToC) || $linkToC->error) ? '' : Core::make('helper/navigation')->getLinkToCollection(
                     $linkToC
                 );
             } else {
@@ -50,7 +50,12 @@ class Controller extends BlockController
         }
     }
 
-    public function registerViewAssets()
+    public function getParagraph()
+    {
+        return LinkAbstractor::translateFrom($this->paragraph);
+    }
+
+    public function registerViewAssets($outputContent = '')
     {
         $this->requireAsset('css', 'font-awesome');
         if (is_object($this->block) && $this->block->getBlockFilename() == 'hover_description') {
@@ -68,6 +73,7 @@ class Controller extends BlockController
 
     public function view()
     {
+        $this->set('paragraph', LinkAbstractor::translateFrom($this->paragraph));
         $this->set('linkURL', $this->getLinkURL());
     }
 
@@ -89,6 +95,7 @@ class Controller extends BlockController
             }
         }
         asort($icons);
+
         return $icons;
     }
 
@@ -113,7 +120,7 @@ class Controller extends BlockController
 
     public function save($args)
     {
-        switch (intval($args['linkType'])) {
+        switch (isset($args['linkType']) ? intval($args['linkType']) : 0) {
             case 1:
                 $args['externalLink'] = '';
                 break;
@@ -125,9 +132,8 @@ class Controller extends BlockController
                 $args['internalLinkCID'] = 0;
                 break;
         }
+        $args['paragraph'] = LinkAbstractor::translateTo($args['paragraph']);
         unset($args['linkType']);
         parent::save($args);
     }
-
-
 }

@@ -29,13 +29,14 @@
             if (resp.oldIssID) {
                 $('head').find('style[data-style-set=' + resp.oldIssID +']').remove();
             }
-            if (resp.issID) {
-                $('head').append($('<style />', {'data-style-set': resp.issID, 'text': resp.css}));
+            if (resp.issID && resp.css) {
+                $('head').append(resp.css);
             }
         },
 
         setupForm: function() {
             var my = this;
+            my.$element.find('.launch-tooltip').tooltip();
             my.$element.concreteAjaxForm({
                 success: function(resp) {
                     my.handleResponse(resp);

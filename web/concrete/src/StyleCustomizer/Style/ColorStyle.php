@@ -78,7 +78,7 @@ class ColorStyle extends Style {
         $cv = new \Primal\Color\Parser($color['color']);
         $result = $cv->getResult();
         $alpha = false;
-        if ($result->alpha && $result->alpha < 1) {
+        if (is_numeric($result->alpha) && $result->alpha >= 0 && $result->alpha < 1) {
             $alpha = $result->alpha;
         }
         $cv = new ColorValue($this->getVariable());
@@ -92,7 +92,7 @@ class ColorStyle extends Style {
     public function getValuesFromVariables($rules = array()) {
         $values = array();
         foreach($rules as $rule) {
-            if (preg_match('/@(.+)\-color/i', $rule->name, $matches)) {
+            if (preg_match('/@(.+)\-color/i',  isset($rule->name) ? $rule->name : '', $matches)) {
                 $value = $rule->value->value[0]->value[0];
                 $cv = static::parse($value, $matches[1]);
                 if (is_object($cv)) {

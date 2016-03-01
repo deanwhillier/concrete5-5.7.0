@@ -3,14 +3,13 @@ namespace Concrete\Controller;
 
 use Concrete\Core\Cache\Cache;
 use Concrete\Core\Config\Renderer;
-use Core;
+use Concrete\Core\Error\Error;
 use Concrete\Core\Localization\Localization as Localization;
 use Controller;
-use Database as DB;
 use Config;
 use Exception;
 use Hautelook\Phpass\PasswordHash;
-use Loader;
+use Core;
 use StartingPointPackage;
 use View;
 
@@ -22,13 +21,20 @@ if (!ini_get('safe_mode')) {
 
 class Install extends Controller
 {
-
     /**
      * This is to check if comments are being stripped
-     * Doctrine ORM depends on comments not being stripped
+     * Doctrine ORM depends on comments not being stripped.
+     *
      * @var int
      */
     protected $docCommentCanary = 1;
+
+    /**
+     * If the database already exists and is valid, lets just attach to it rather than installing over it.
+     *
+     * @var bool
+     */
+    protected $auto_attach = false;
 
     protected $fp;
     protected $fpu;
@@ -39,6 +45,7 @@ class Install extends Controller
     {
         $v = new View('/frontend/install');
         $v->setViewTheme('concrete');
+
         return $v;
     }
 
@@ -57,68 +64,87 @@ class Install extends Controller
     protected function testAndRunInstall()
     {
         if (file_exists(DIR_CONFIG_SITE . '/site_install_user.php')) {
-            require(DIR_CONFIG_SITE . '/site_install.php');
-            @include(DIR_CONFIG_SITE . '/site_install_user.php');
+            require DIR_CONFIG_SITE . '/site_install.php';
+            @include DIR_CONFIG_SITE . '/site_install_user.php';
             if (defined('SITE_INSTALL_LOCALE') && Localization::activeLocale() !== SITE_INSTALL_LOCALE) {
                 Localization::changeLocale(SITE_INSTALL_LOCALE);
             }
-            $e = Loader::helper('validation/error');
+            $e = Core::make('helper/validation/error');
             $e = $this->validateDatabase($e);
+            if (defined('INSTALL_STARTING_POINT') && INSTALL_STARTING_POINT) {
+                $spName = INSTALL_STARTING_POINT;
+            } else {
+                $spName = 'elemental_full';
+            }
+            $spl = StartingPointPackage::getClass($spName);
+            if ($spl === null) {
+                $e->add(t('Invalid starting point: %s', $spName));
+            }
             if ($e->has()) {
                 $this->set('error', $e);
             } else {
-                if (defined('INSTALL_STARTING_POINT') && INSTALL_STARTING_POINT) {
-                    $spl = StartingPointPackage::getClass(INSTALL_STARTING_POINT);
-                } else {
-                    $spl = StartingPointPackage::getClass('elemental_full');
-                }
                 $this->set('installPackage', $spl->getPackageHandle());
                 $this->set('installRoutines', $spl->getInstallRoutines());
                 $this->set(
                     'successMessage',
                     t(
                         'Congratulations. concrete5 has been installed. You have been logged in as <b>%s</b> with the password you chose. If you wish to change this password, you may do so from the users area of the dashboard.',
-                        USER_SUPER));
+                        USER_SUPER
+                    )
+                );
             }
         }
     }
 
-    protected function validateDatabase($e)
+    protected function validateDatabase(Error $e)
     {
         if (!extension_loaded('pdo')) {
             $e->add($this->getDBErrorMsg());
         } else {
-
+            $DB_SERVER = isset($_POST['DB_SERVER']) ? $_POST['DB_SERVER'] : null;
+            $DB_DATABASE = isset($_POST['DB_DATABASE']) ? $_POST['DB_DATABASE'] : null;
             $db = \Database::getFactory()->createConnection(
                 array(
-                    'host'     => $_POST['DB_SERVER'],
-                    'user'     => $_POST['DB_USERNAME'],
-                    'password' => $_POST['DB_PASSWORD'],
-                    'database' => $_POST['DB_DATABASE']
-                ));
-
-            $DB_SERVER = $_POST['DB_SERVER'];
-            $DB_DATABASE = $_POST['DB_DATABASE'];
+                    'host' => $DB_SERVER,
+                    'user' => isset($_POST['DB_USERNAME']) ? $_POST['DB_USERNAME'] : null,
+                    'password' => isset($_POST['DB_PASSWORD']) ? $_POST['DB_PASSWORD'] : null,
+                    'database' => $DB_DATABASE,
+                )
+            );
 
             if ($DB_SERVER && $DB_DATABASE) {
                 if (!$db) {
                     $e->add(t('Unable to connect to database.'));
-                } else {
+                } elseif (!$this->isAutoAttachEnabled()) {
                     $num = $db->GetCol("show tables");
                     if (count($num) > 0) {
                         $e->add(
                             t(
                                 'There are already %s tables in this database. concrete5 must be installed in an empty database.',
-                                count($num)));
+                                count($num)
+                            )
+                        );
                     }
 
-                    $support = $db->GetOne('SELECT SUPPORT FROM INFORMATION_SCHEMA.ENGINES WHERE ENGINE = \'InnoDB\'');
-                    if (!in_array($support, array('YES', 'DEFAULT'))) {
-                        $e->add(t('Your MySQL database does not support InnoDB database tables. These are required.'));
+                    try {
+                        $support = $db->GetAll('show engines');
+                        $supported = false;
+                        foreach ($support as $engine) {
+                            $engine = array_change_key_case($engine, CASE_LOWER);
+                            if (isset($engine['engine']) && strtolower($engine['engine']) == 'innodb') {
+                                $supported = true;
+                            }
+                        }
+                        if (!$supported) {
+                            $e->add(t('Your MySQL database does not support InnoDB database tables. These are required.'));
+                        }
+                    } catch (\Exception $exception) {
+                        // we're going to just proceed and hope for the best.
                     }
                 }
             }
         }
+
         return $e;
     }
 
@@ -129,16 +155,14 @@ class Install extends Controller
 
     public function setup()
     {
-
     }
 
     public function select_language()
     {
-
     }
 
     /**
-     * Testing
+     * Testing.
      */
     public function on_start()
     {
@@ -156,33 +180,13 @@ class Install extends Controller
         if (!isset($_COOKIE['CONCRETE5_INSTALL_TEST'])) {
             setcookie('CONCRETE5_INSTALL_TEST', '1', 0, DIR_REL . '/');
         }
-    }
 
-    /**
-     * Nice and elegant function for converting memory. Thanks to @lightness races in orbit on Stackoverflow.
-     * @param $val
-     * @return int|string
-     */
-    protected function getBytes($val)
-    {
-        $val = trim($val);
-        $last = strtolower($val[strlen($val)-1]);
-        switch($last) {
-            // The 'G' modifier is available since PHP 5.1.0
-            case 'g':
-                $val *= 1024;
-            case 'm':
-                $val *= 1024;
-            case 'k':
-                $val *= 1024;
-        }
-
-        return $val;
+        $this->set('pageTitle', t('Install concrete5'));
     }
 
     private function setRequiredItems()
     {
-//        $this->set('imageTest', function_exists('imagecreatetruecolor') || class_exists('Imagick'));
+        //        $this->set('imageTest', function_exists('imagecreatetruecolor') || class_exists('Imagick'));
         $this->set('imageTest', function_exists('imagecreatetruecolor')
             && function_exists('imagepng')
             && function_exists('imagegif')
@@ -203,18 +207,18 @@ class Install extends Controller
             $this->set('memoryTest', 1);
             $this->set('memoryBytes', 0);
         } else {
-            $val = $this->getBytes($memoryLimit);
+            $val = Core::make('helper/number')->getBytes($memoryLimit);
             $this->set('memoryBytes', $val);
             if ($val < 25165824) {
                 $this->set('memoryTest', -1);
-            } else if ($val >= 67108864) {
+            } elseif ($val >= 67108864) {
                 $this->set('memoryTest', 1);
             } else {
                 $this->set('memoryTest', 0);
             }
         }
 
-        $phpVmin = '5.3.3';
+        $phpVmin = $this->getMinimumPhpVersion();
         if (version_compare(PHP_VERSION, $phpVmin, '>=')) {
             $phpVtest = true;
         } else {
@@ -226,7 +230,7 @@ class Install extends Controller
 
     private function testFileWritePermissions()
     {
-        $e = Loader::helper('validation/error');
+        $e = Core::make('helper/validation/error');
         if (!is_writable(DIR_CONFIG_SITE)) {
             $e->add(t('Your configuration directory config/ does not appear to be writable by the web server.'));
         }
@@ -267,22 +271,25 @@ class Install extends Controller
 
     public function test_url($num1, $num2)
     {
-        $js = Loader::helper('json');
+        $js = Core::make('helper/json');
         $num = $num1 + $num2;
-        print $js->encode(array('response' => $num));
+        echo $js->encode(array('response' => $num));
         exit;
     }
 
     public function run_routine($pkgHandle, $routine)
     {
         $spl = StartingPointPackage::getClass($pkgHandle);
-        require(DIR_CONFIG_SITE . '/site_install.php');
-        @include(DIR_CONFIG_SITE . '/site_install_user.php');
+        require DIR_CONFIG_SITE . '/site_install.php';
+        @include DIR_CONFIG_SITE . '/site_install_user.php';
 
-        $jsx = Loader::helper('json');
-        $js = new \stdClass;
+        $jsx = Core::make('helper/json');
+        $js = new \stdClass();
 
         try {
+            if ($spl === null) {
+                throw new Exception(t('Invalid starting point: %s', $pkgHandle));
+            }
             call_user_func(array($spl, $routine));
             $js->error = false;
         } catch (Exception $e) {
@@ -290,7 +297,7 @@ class Install extends Controller
             $js->message = tc('InstallError', '%s.<br><br>Trace:<br>%s', $e->getMessage(), $e->getTraceAsString());
             $this->reset();
         }
-        print $jsx->encode($js);
+        echo $jsx->encode($js);
         exit;
     }
 
@@ -309,11 +316,15 @@ class Install extends Controller
         }
     }
 
+    /**
+     * @return \Concrete\Core\Error\Error
+     */
     public function configure()
     {
+        $error = \Core::make('helper/validation/error');
+        /* @var $error \Concrete\Core\Error\Error */
         try {
-
-            $val = Loader::helper('validation/form');
+            $val = Core::make('helper/validation/form');
             $val->setData($this->post());
             $val->addRequired("SITE", t("Please specify your site's name"));
             $val->addRequiredEmail("uEmail", t('Please specify a valid email address'));
@@ -323,32 +334,31 @@ class Install extends Controller
             $password = $_POST['uPassword'];
             $passwordConfirm = $_POST['uPasswordConfirm'];
 
-            $e = Loader::helper('validation/error');
-            $uh = Loader::helper('concrete/user');
-            $uh->validNewPassword($password, $e);
+            Core::make('validator/password')->isValid($password, $error);
 
             if ($password) {
                 if ($password != $passwordConfirm) {
-                    $e->add(t('The two passwords provided do not match.'));
+                    $error->add(t('The two passwords provided do not match.'));
                 }
             }
 
             if (is_object($this->fileWriteErrors)) {
-                $e = $this->fileWriteErrors;
+                foreach ($this->fileWriteErrors->getList() as $msg) {
+                    $error->add($msg);
+                }
             }
 
-            $e = $this->validateDatabase($e);
-            $e = $this->validateSampleContent($e);
+            $error = $this->validateDatabase($error);
+            $error = $this->validateSampleContent($error);
 
-            if ($val->test() && (!$e->has())) {
+            if ($val->test() && (!$error->has())) {
 
                 // write the config file
-                $vh = Loader::helper('validation/identifier');
+                $vh = Core::make('helper/validation/identifier');
                 $this->fp = @fopen(DIR_CONFIG_SITE . '/site_install.php', 'w+');
                 $this->fpu = @fopen(DIR_CONFIG_SITE . '/site_install_user.php', 'w+');
                 if ($this->fp) {
-
-                    $config = (array)$_POST['SITE_CONFIG'];
+                    $config = isset($_POST['SITE_CONFIG']) ? ((array) $_POST['SITE_CONFIG']) : array();
                     $config['database'] = array(
                         'default-connection' => 'concrete',
                         'connections' => array(
@@ -358,11 +368,10 @@ class Install extends Controller
                                 'database' => $_POST['DB_DATABASE'],
                                 'username' => $_POST['DB_USERNAME'],
                                 'password' => $_POST['DB_PASSWORD'],
-                                'charset' => 'utf8'
-                            )
-                        )
+                                'charset' => 'utf8',
+                            ),
+                        ),
                     );
-
 
                     $renderer = new Renderer($config);
                     fwrite($this->fp, $renderer->render());
@@ -376,13 +385,12 @@ class Install extends Controller
                 if ($this->fpu) {
                     $hasher = new PasswordHash(Config::get('concrete.user.password.hash_cost_log2'), Config::get('concrete.user.password.hash_portable'));
                     $configuration = "<?php\n";
-                    $configuration .= "define('INSTALL_USER_EMAIL', '" . $_POST['uEmail'] . "');\n";
-                    $configuration .= "define('INSTALL_USER_PASSWORD_HASH', '" . $hasher->HashPassword(
-                            $_POST['uPassword']) . "');\n";
-                    $configuration .= "define('INSTALL_STARTING_POINT', '" . $this->post('SAMPLE_CONTENT') . "');\n";
-                    $configuration .= "define('SITE', '" . addslashes($_POST['SITE']) . "');\n";
+                    $configuration .= "define('INSTALL_USER_EMAIL', " . var_export((string) $_POST['uEmail'], true) . ");\n";
+                    $configuration .= "define('INSTALL_USER_PASSWORD_HASH', " . var_export((string) $hasher->HashPassword($_POST['uPassword']), true) . ");\n";
+                    $configuration .= "define('INSTALL_STARTING_POINT', " . var_export((string) $this->post('SAMPLE_CONTENT'), true) . ");\n";
+                    $configuration .= "define('SITE', " . var_export((string) $_POST['SITE'], true) . ");\n";
                     if (Localization::activeLocale() != '' && Localization::activeLocale() != 'en_US') {
-                        $configuration .= "define('SITE_INSTALL_LOCALE', '" . Localization::activeLocale() . "');\n";
+                        $configuration .= "define('SITE_INSTALL_LOCALE', " . var_export((string) Localization::activeLocale(), true) . ");\n";
                     }
                     $res = fwrite($this->fpu, $configuration);
                     fclose($this->fpu);
@@ -393,30 +401,52 @@ class Install extends Controller
                 } else {
                     throw new Exception(t('Unable to open config/site_user.php for writing.'));
                 }
-
             } else {
-
-                if ($e->has()) {
-                    $this->set('error', $e);
+                if ($error->has()) {
+                    $this->set('error', $error);
                 } else {
+                    $error = $val->getError();
                     $this->set('error', $val->getError());
                 }
             }
-
-        } catch (Exception $e) {
+        } catch (Exception $ex) {
             $this->reset();
-            $this->set('error', $e);
+            $this->set('error', $ex);
+            $error->add($ex);
         }
+
+        return $error;
     }
 
     protected function validateSampleContent($e)
     {
         $pkg = StartingPointPackage::getClass($this->post('SAMPLE_CONTENT'));
-        if (!is_object($pkg)) {
+
+        if ($pkg === null) {
             $e->add(t("You must select a valid sample content starting point."));
         }
+
         return $e;
     }
 
-}
+    public function getMinimumPhpVersion()
+    {
+        return '5.3.3';
+    }
 
+    /**
+     * @return bool
+     */
+    public function isAutoAttachEnabled()
+    {
+        return $this->auto_attach;
+    }
+
+    /**
+     * @param bool $auto_attach
+     */
+    public function setAutoAttach($auto_attach)
+    {
+        $this->auto_attach = $auto_attach;
+    }
+}

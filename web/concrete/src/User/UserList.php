@@ -177,7 +177,7 @@ class UserList extends DatabaseItemList
 
     /**
      * Filters the user list for only users within the provided group.  Accepts an instance of a group object or a string group name
-     * @param \Concrete\Core\User\Group | string $group
+     * @param \Group | string $group
      * @param boolean $inGroup
      * @return void
      */
@@ -188,7 +188,7 @@ class UserList extends DatabaseItemList
         }
 
         $table = 'ug' . $group->getGroupID();
-        $this->query->leftJoin('u', 'UserGroups', $table, 'u.uID = ' . $table . '.uID');
+        $this->query->leftJoin('u', 'UserGroups', $table, 'u.uID = ' . $table . '.uID AND ' . $table . '.gID = ' . $group->getGroupID());
         if ($inGroup) {
             $this->query->andWhere($table . '.gID = :gID' . $group->getGroupID());
             $this->query->setParameter('gID' . $group->getGroupID(), $group->getGroupID());
@@ -229,6 +229,11 @@ class UserList extends DatabaseItemList
     public function sortByUserName()
     {
         $this->query->orderBy('u.uName', 'asc');
+    }
+
+    public function sortByDateAdded()
+    {
+        $this->query->orderBy('u.uDateAdded', 'desc');
     }
 
 

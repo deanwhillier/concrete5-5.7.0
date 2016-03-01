@@ -8,20 +8,26 @@ use Core;
 class CustomStyle extends AbstractCustomStyle
 {
 
-    /**
-     * @var string
-     */
-    protected $arHandle;
+    protected $area;
 
     /**
      * @var StyleSet
      */
     protected $set;
 
-    public function __construct(StyleSet $set = null, $arHandle = null)
+    protected $theme;
+
+    public function __construct(StyleSet $set = null, Area $area, $theme)
     {
-        $this->arHandle = $arHandle;
+        $this->area = $area;
         $this->set = $set;
+        $this->theme = $theme;
+    }
+
+    public function getStyleWrapper($css)
+    {
+        $style = '<style type="text/css" data-area-style-area-handle="' . $this->area->getAreaHandle() . '" data-style-set="' . $this->getStyleSet()->getID() . '">' . $css . '</style>';
+        return $style;
     }
 
     /**
@@ -30,72 +36,86 @@ class CustomStyle extends AbstractCustomStyle
     public function getCSS()
     {
         $set = $this->set;
-        $css = '.' . str_replace(' ', '.', $this->getContainerClass()) . '{';
+        $groups = array();
         if ($set->getBackgroundColor()) {
-            $css .= 'background-color:' . $set->getBackgroundColor() . ';';
+            $groups[''][] = 'background-color:' . $set->getBackgroundColor();
         }
         $f = $set->getBackgroundImageFileObject();
         if (is_object($f)) {
-            $css .= 'background-image: url(' . $f->getRelativePath() . ');';
-            $css .= 'background-repeat: ' . $set->getBackgroundRepeat() . ';';
+            $url = $f->getRelativePath();
+            if (!$url) {
+                $url = $f->getURL();
+            }
+            $groups[''][] = 'background-image: url(' . $url . ')';
+            $groups[''][] = 'background-repeat: ' . $set->getBackgroundRepeat();
+            $groups[''][] = 'background-size: ' . $set->getBackgroundSize();
+            $groups[''][] = 'background-position: ' . $set->getBackgroundPosition();
         }
         if ($set->getBaseFontSize()) {
-            $css .= 'font-size:' . $set->getBaseFontSize() . ';';
+            $groups[''][] = 'font-size:' . $set->getBaseFontSize();
         }
         if ($set->getTextColor()) {
-            $css .= 'color:' . $set->getTextColor() . ';';
+            $groups[''][] = 'color:' . $set->getTextColor();
         }
         if ($set->getPaddingTop()) {
-            $css .= 'padding-top:' . $set->getPaddingTop() . ';';
+            $groups[''][] = 'padding-top:' . $set->getPaddingTop();
         }
         if ($set->getPaddingRight()) {
-            $css .= 'padding-right:' . $set->getPaddingRight() . ';';
+            $groups[''][] = 'padding-right:' . $set->getPaddingRight();
         }
         if ($set->getPaddingBottom()) {
-            $css .= 'padding-bottom:' . $set->getPaddingBottom() . ';';
+            $groups[''][] = 'padding-bottom:' . $set->getPaddingBottom();
         }
         if ($set->getPaddingLeft()) {
-            $css .= 'padding-left:' . $set->getPaddingLeft() . ';';
+            $groups[''][] = 'padding-left:' . $set->getPaddingLeft();
         }
         if ($set->getBorderWidth()) {
-            $css .= 'border-width:' . $set->getBorderWidth() . ';';
+            $groups[''][] = 'border-width:' . $set->getBorderWidth();
         }
         if ($set->getBorderStyle()) {
-            $css .= 'border-style:' . $set->getBorderStyle() . ';';
+            $groups[''][] = 'border-style:' . $set->getBorderStyle();
         }
         if ($set->getBorderColor()) {
-            $css .= 'border-color:' . $set->getBorderColor() . ';';
+            $groups[''][] = 'border-color:' . $set->getBorderColor();
         }
         if ($set->getAlignment()) {
-            $css .= 'text-align:' . $set->getAlignment() . ';';
+            $groups[''][] = 'text-align:' . $set->getAlignment();
         }
         if ($set->getBorderRadius()) {
-            $css .= 'border-radius:' . $set->getBorderRadius() . ';';
-            $css .= '-moz-border-radius:' . $set->getBorderRadius() . ';';
-            $css .= '-webkit-border-radius:' . $set->getBorderRadius() . ';';
-            $css .= '-o-border-radius:' . $set->getBorderRadius() . ';';
-            $css .= '-ms-border-radius:' . $set->getBorderRadius() . ';';
+            $groups[''][] = 'border-radius:' . $set->getBorderRadius();
+            $groups[''][] = '-moz-border-radius:' . $set->getBorderRadius();
+            $groups[''][] = '-webkit-border-radius:' . $set->getBorderRadius();
+            $groups[''][] = '-o-border-radius:' . $set->getBorderRadius();
+            $groups[''][] = '-ms-border-radius:' . $set->getBorderRadius();
         }
         if ($set->getRotate()) {
-            $css .= 'transform: rotate(' . $set->getRotate() . 'deg);';
-            $css .= '-moz-transform: rotate(' . $set->getRotate() . 'deg);';
-            $css .= '-webkit-transform: rotate(' . $set->getRotate() . 'deg);';
-            $css .= '-o-transform: rotate(' . $set->getRotate() . 'deg);';
-            $css .= '-ms-transform: rotate(' . $set->getRotate() . 'deg);';
+            $groups[''][] = 'transform: rotate(' . $set->getRotate() . 'deg)';
+            $groups[''][] = '-moz-transform: rotate(' . $set->getRotate() . 'deg)';
+            $groups[''][] = '-webkit-transform: rotate(' . $set->getRotate() . 'deg)';
+            $groups[''][] = '-o-transform: rotate(' . $set->getRotate() . 'deg)';
+            $groups[''][] = '-ms-transform: rotate(' . $set->getRotate() . 'deg)';
         }
         if ($set->getBoxShadowSpread()) {
-            $css .= 'box-shadow: ' . $set->getBoxShadowHorizontal() . ' ' . $set->getBoxShadowVertical();
-            $css .= ' ' . $set->getBoxShadowBlur() . ' ' . $set->getBoxShadowSpread() . ' ' . $set->getBoxShadowColor();
+            $groups[''][] = 'box-shadow: ' . $set->getBoxShadowHorizontal() . ' ' . $set->getBoxShadowVertical() . ' ' . $set->getBoxShadowBlur() . ' ' . $set->getBoxShadowSpread() . ' ' . $set->getBoxShadowColor();
         }
-
-        $css .= '}';
-
         if ($set->getLinkColor()) {
-            $css .= '.' . $this->getContainerClass() . ' a {';
-            $css .= 'color:' . $set->getLinkColor() . ' !important;';
-            $css .= '}';
+            $groups[' a'][] = 'color:' . $set->getLinkColor() . ' !important';
         }
+
+        $css = '';
+        foreach($groups as $suffix => $styles) {
+            $css .= '.' . str_replace(' ', '.', $this->getCustomStyleClass()) . $suffix . '{'.implode(';', $styles).'}';
+        }
+
         return $css;
+    }
+
+    public function getCustomStyleClass()
+    {
+        $class = 'ccm-custom-style-';
+        $txt = Core::make('helper/text');
+        $class .= strtolower($txt->filterNonAlphaNum($this->area->getAreaHandle()));
+        return $class;
     }
 
     /**
@@ -103,12 +123,17 @@ class CustomStyle extends AbstractCustomStyle
      */
     public function getContainerClass()
     {
-        $class = 'ccm-custom-style-';
-        $txt = Core::make('helper/text');
-        $class .= strtolower($txt->filterNonAlphaNum($this->arHandle));
-        if (is_object($this->set) && $this->set->getCustomClass()) {
-            $class .= ' ' . $this->set->getCustomClass();
+        $classes = array($this->getCustomStyleClass());
+
+        if (is_object($this->set)) {
+            if ($this->set->getCustomClass()) {
+                $classes[] = $this->set->getCustomClass();
+            }
+            if (is_object($this->theme) && ($gf = $this->theme->getThemeGridFrameworkObject())) {
+                $classes = array_merge($gf->getPageThemeGridFrameworkSelectedDeviceHideClassesForDisplay($this->set, $this->area->getAreaCollectionObject()), $classes);
+            }
         }
-        return $class;
+
+        return implode(' ', $classes);
     }
 }

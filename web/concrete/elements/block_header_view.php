@@ -22,17 +22,22 @@ if ($showMenu) { ?>
     <div data-container="block">
 <? } ?>
 
+<? if (is_object($css) && $b->getBlockTypeHandle() == BLOCK_HANDLE_LAYOUT_PROXY) { ?>
+    <? // in this instance, the css container comes OUTSIDE any theme container ?>
+    <div class="<?=$css->getContainerClass() ?>" >
+<? } ?>
+
 <?
 if (
     $pt->supportsGridFramework()
     && $a->isGridContainerEnabled()
-    && !$bt->ignorePageThemeGridFrameworkContainer()
+    && !$b->ignorePageThemeGridFrameworkContainer()
 ) {
     $gf = $pt->getThemeGridFrameworkObject();
     print $gf->getPageThemeGridFrameworkContainerStartHTML();
     print $gf->getPageThemeGridFrameworkRowStartHTML();
     printf('<div class="%s">', $gf->getPageThemeGridFrameworkColumnClassesForSpan(
-        $gf->getPageThemeGridFrameworkNumColumns()
+        min($a->getAreaGridMaximumColumns(), $gf->getPageThemeGridFrameworkNumColumns())
     ));
 }
 
@@ -98,7 +103,7 @@ if ($showMenu) {
         data-cID="<?=$c->getCollectionID()?>"
         data-area-id="<?=$a->getAreaID()?>"
         data-block-id="<?=$b->getBlockID()?>"
-        data-block-type-wraps="<?= intval(!$bt->ignorePageThemeGridFrameworkContainer(), 10) ?>"
+        data-block-type-wraps="<?= intval(!$b->ignorePageThemeGridFrameworkContainer(), 10) ?>"
         class="<?=$class?>"
         data-block-type-handle="<?=$btHandle?>"
         data-launch-block-menu="block-menu-b<?=$b->getBlockID()?>-<?=$a->getAreaID()?>"
@@ -106,7 +111,7 @@ if ($showMenu) {
         <? if ($btw->getBlockTypeHandle() == BLOCK_HANDLE_LAYOUT_PROXY) { ?> data-block-menu-handle="none"<? } ?>
         >
 
-    <? if (is_object($css)) { ?>
+    <? if (is_object($css) && $b->getBlockTypeHandle() != BLOCK_HANDLE_LAYOUT_PROXY) { ?>
     <div class="<?=$css->getContainerClass() ?>" >
     <? } ?>
 
@@ -154,7 +159,7 @@ if ($showMenu) {
                         <? } ?>
 
                         <? if ($b->getBlockTypeHandle() != BLOCK_HANDLE_LAYOUT_PROXY && $b->getBlockTypeHandle() != BLOCK_HANDLE_PAGE_TYPE_OUTPUT_PROXY) { ?>
-                            <li><a href="javascript:void(0)" data-menu-action="block_scrapbook"><?=t("Copy to Clipboard")?></a></li>
+                            <li><a href="javascript:void(0)" data-menu-action="block_scrapbook" data-token="<?= Core::make('token')->generate('tools/clipboard/to'); ?>"><?=t("Copy to Clipboard")?></a></li>
                         <? } ?>
 
 
@@ -164,13 +169,13 @@ if ($showMenu) {
 
                         <? if ($b->getBlockTypeHandle() != BLOCK_HANDLE_LAYOUT_PROXY) { ?>
 
-                            <? if ($canDesign || $canEditCustomTemplate || $canEditBlockName || $canEditCacheSettings) { ?>
+                            <? if ($canDesign || $canEditCustomTemplate || $canEditName || $canEditCacheSettings) { ?>
                                 <li class="divider"></li>
 
                                 <? if ($canDesign || $canEditCustomTemplate) { ?>
                                     <li><a href="#" data-menu-action="block_design"><?=t("Design &amp; Custom Template")?></a></li>
                                 <? } ?>
-                                <? if ($b->getBlockTypeHandle() != BLOCK_HANDLE_PAGE_TYPE_OUTPUT_PROXY && ($canEditBlockName || $canEditCacheSettings)) { ?>
+                                <? if ($b->getBlockTypeHandle() != BLOCK_HANDLE_PAGE_TYPE_OUTPUT_PROXY && ($canEditName || $canEditCacheSettings)) { ?>
                                     <li><a dialog-title="<?=t('Advanced Block Settings')?>" dialog-modal="false" dialog-width="500" dialog-height="320" data-menu-action="block_dialog" data-menu-href="<?=URL::to('/ccm/system/dialogs/block/cache')?>" ><?=t("Advanced")?></a></li>
                                 <? } ?>
                             <? } ?>
@@ -178,10 +183,10 @@ if ($showMenu) {
                             <? if ($b->getBlockTypeHandle() != BLOCK_HANDLE_PAGE_TYPE_OUTPUT_PROXY && ($canModifyGroups || $canScheduleGuestAccess || $canAliasBlockOut)) { ?>
                                 <li class="divider"></li>
                                 <? if ($canModifyGroups) { ?>
-                                    <li><a dialog-title="<?=t('Block Permissions')?>" dialog-modal="false" dialog-width="350" dialog-height="420" data-menu-action="block_dialog" data-menu-href="<?=URL::to('/ccm/system/dialogs/block/permissions/list')?>" ><?=t("Permissions")?></a></li>
+                                    <li><a dialog-title="<?=t('Block Permissions')?>" dialog-modal="false" dialog-width="350" dialog-height="450" data-menu-action="block_dialog" data-menu-href="<?=URL::to('/ccm/system/dialogs/block/permissions/list')?>" ><?=t("Permissions")?></a></li>
                                 <? } ?>
                                 <? if ($canScheduleGuestAccess) { ?>
-                                    <li><a dialog-title="<?=t('Schedule Guest Access')?>" dialog-modal="false" dialog-width="500" dialog-height="220" data-menu-action="block_dialog" data-menu-href="<?=URL::to('/ccm/system/dialogs/block/permissions/guest_access')?>" ><?=t("Schedule Guest Access")?></a></li>
+                                    <li><a dialog-title="<?=t('Schedule Guest Access')?>" dialog-modal="false" dialog-width="500" dialog-height="320" data-menu-action="block_dialog" data-menu-href="<?=URL::to('/ccm/system/dialogs/block/permissions/guest_access')?>" ><?=t("Schedule Guest Access")?></a></li>
                                 <? } ?>
                                 <? if ($canAliasBlockOut) { ?>
                                     <li><a dialog-title="<?=t('Setup on Child Pages')?>" dialog-modal="false" dialog-width="550" dialog-height="450" data-menu-action="block_dialog" data-menu-href="<?=URL::to('/ccm/system/dialogs/block/aliasing')?>" ><?=t("Setup on Child Pages")?></a></li>
@@ -196,7 +201,7 @@ if ($showMenu) {
         </div>
 
 <? } else { ?>
-    <? if (is_object($css)) { ?>
+    <? if (is_object($css) && $b->getBlockTypeHandle() != BLOCK_HANDLE_LAYOUT_PROXY) { ?>
     <div class="<?=$css->getContainerClass() ?>" >
     <? } ?>
 <? } ?>

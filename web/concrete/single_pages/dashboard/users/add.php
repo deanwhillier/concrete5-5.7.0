@@ -22,7 +22,7 @@
 					<label for="uPassword" class="control-label col-sm-3"><?=t('Password')?></label>
 					<div class="col-sm-7">
 						<div class="input-group">
-						<?=$form->password('uPassword')?>
+						<?=$form->password('uPassword',array('autocomplete' => 'off'))?>
 						<span class="input-group-addon"><i class="fa fa-asterisk"></i></span>
 						</div>
 					</div>
@@ -68,7 +68,7 @@
 	                	<div class="form-group">
 	                    	<label class="control-label col-sm-3"><?=$ak->getAttributeKeyDisplayName()?></label>
 	                    	<div class="col-sm-7">
-		                        <? $ak->render('form', $caValue, false)?>
+		                        <? $ak->render('form', null, false)?>
 		                    </div>
 		                </div>
 		            </div>
@@ -92,7 +92,7 @@
 				<div class="col-sm-7">
 					<div class="checkbox">
 					<label>
-						<input type="checkbox" name="gID[]" value="<?=$g->getGroupID()?>" <? if (is_array($_POST['gID']) && in_array($g->getGroupID(), $_POST['gID'])) { ?> checked <? } ?>>
+						<input type="checkbox" name="gID[]" value="<?=$g->getGroupID()?>" <? if (isset($_POST['gID']) && is_array($_POST['gID']) && in_array($g->getGroupID(), $_POST['gID'])) { ?> checked <? } ?>>
 						<?=$g->getGroupDisplayName()?>
 					</label>
 					</div>

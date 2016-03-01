@@ -1,30 +1,18 @@
 <?
 defined('C5_EXECUTE') or die("Access Denied.");
-$class = 'ccm-block-content-editor-composer';
-$form = Loader::helper('form');
 ?>
 
-<div class="control-group">
-	<label class="control-label"><?=$label?></label>
+<div class="form-group">
+	<label><?=$label?></label>
 	<? if($description): ?>
 	<i class="fa fa-question-circle launch-tooltip" title="" data-original-title="<?=$description?>"></i>
 	<? endif; ?>
-	<div class="controls">
-		<?
-		print $form->textarea($view->field('content'), $controller->getContentEditMode(), array(
-			'class' => $class
-		));
-		?>
-	</div>
+	<?
+	$content = $controller->getContentEditMode();
+	if ($_SERVER['REQUEST_METHOD'] == 'POST') {
+		$data = $view->getRequestValue();
+		$content = $data['content'];
+	}
+	print Core::make('editor')->outputPageComposerEditor($view->field('content'), $content);
+	?>
 </div>
-
-<script type="text/javascript">
-var CCM_EDITOR_SECURITY_TOKEN = "<?=Loader::helper('validation/token')->generate('editor')?>";
-
-$(function() {
-	$('.<?=$class?>').redactor({
-		'plugins': ['concrete5'],
-        'minHeight': 380
-	});
-});
-</script>

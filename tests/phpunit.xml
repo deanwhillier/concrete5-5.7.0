@@ -7,17 +7,12 @@
         backupGlobals="false"
         backupStaticAttributes="false">
     <testsuites>
-        <testsuite name="BlockTypes">
-            <directory>tests/Asset/</directory>
-        </testsuite>
-        <testsuite name="BlockTypes">
-            <directory>tests/Block/</directory>
-        </testsuite>
-        <testsuite name="Attributes">
-            <directory>tests/Attribute/</directory>
-        </testsuite>
-        <testsuite name="Core">
+        <testsuite name="Tests">
             <directory>tests/Core/</directory>
+            <directory>tests/Asset/</directory>
+            <directory>tests/Block/</directory>
+            <directory>tests/Attribute/</directory>
+            <directory>tests/Localization/</directory>
         </testsuite>
     </testsuites>
 </phpunit>

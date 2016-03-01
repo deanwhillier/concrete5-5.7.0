@@ -1,5 +1,11 @@
-<? defined('C5_EXECUTE') or die("Access Denied.");?>
+<? defined('C5_EXECUTE') or die("Access Denied.");
+$token = \Core::make('token');
+?>
     <form method="post" id="public-profiles-form" action="<?php echo $view->url('/dashboard/system/registration/profiles', 'update_profiles')?>">
+		<?php
+		$token->output('update_profile');
+		?>
+
 	<div class="container">
     	<div class="row">
     		<div class="col-sm-12">
@@ -38,7 +44,7 @@
 
 	<div class="ccm-dashboard-form-actions-wrapper">
 	<div class="ccm-dashboard-form-actions">
-		<button class="pull-right btn btn-success" type="submit" ><?=t('Save')?></button>
+		<button class="pull-right btn btn-primary" type="submit" ><?=t('Save')?></button>
 	</div>
 	</div>
 

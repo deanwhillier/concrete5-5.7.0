@@ -36,7 +36,14 @@ $class = 'ccm-area-footer';
 		$showAreaDesign = ($ap->canEditAreaDesign() && Config::get('concrete.design.enable_custom') == true);
 		$showAreaLayouts = ($ap->canAddLayoutToArea() && Config::get('concrete.design.enable_layouts') == true && (!$a->isGlobalArea()));
 		$canEditAreaPermissions = ($ap->canEditAreaPermissions() && Config::get('concrete.permissions.model') != 'simple' && (!$a->isGlobalArea()));
-	?>
+        $showAddBlock = !!$ap->canAddBlocks();
+
+    if ($showAddBlock) {
+        ?>
+        <li><a href='#' data-menu-action="area-add-block"><?= t('Add Block') ?></a></li>
+        <?php
+    }
+    ?>
 
 	<? if ($showAreaDesign || $showAreaLayouts) { ?>
 		<? if ($showAreaDesign) { ?>
@@ -61,16 +68,14 @@ $class = 'ccm-area-footer';
 	<?
 	if ($a instanceof SubArea) {
 		$pk = PermissionKey::getByHandle('manage_layout_presets');
-		if (!is_object($areabt)) {
-			$areabt = BlockType::getByHandle(BLOCK_HANDLE_LAYOUT_PROXY);
-		}
 		$ax = $a->getSubAreaParentPermissionsObject();
 		$axp = new Permissions($ax);
-		if ($axp->canAddBlockToArea($bt)) {
+		if ($axp->canAddLayout()) {
 			$bx = $a->getSubAreaBlockObject();
 			if (is_object($bx) && !$bx->isError()) { ?>
 				<li class="divider"></li>
 				<li><a href="javascript:void(0)" data-container-layout-block-id="<?=$bx->getBlockID()?>" data-menu-action="edit-container-layout" data-area-grid-maximum-columns="<?=$a->getAreaGridMaximumColumns()?>"><?=t("Edit Container Layout")?></a></li>
+				<li><a href="javascript:void(0)" data-container-layout-block-id="<?=$bx->getBlockID()?>" data-menu-action="edit-container-layout-style"><?=t("Edit Layout Design")?></a></li>
 				<? if ($pk->validate()) {
 					$btc = $bx->getController();
 					$arLayout = $btc->getAreaLayoutObject(); ?>

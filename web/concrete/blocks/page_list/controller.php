@@ -1,20 +1,20 @@
 <?php
+
 namespace Concrete\Block\PageList;
 
 use BlockType;
 use CollectionAttributeKey;
 use Concrete\Core\Block\BlockController;
 use Concrete\Core\Page\Feed;
-use Loader;
+use Database;
 use Page;
 use Core;
 use PageList;
 use Concrete\Core\Attribute\Key\CollectionKey;
-use \Concrete\Core\Tree\Node\Type\Topic;
+use Concrete\Core\Tree\Node\Type\Topic;
 
 class Controller extends BlockController
 {
-
     protected $btTable = 'btPageList';
     protected $btInterfaceWidth = "800";
     protected $btInterfaceHeight = "350";
@@ -22,10 +22,13 @@ class Controller extends BlockController
     protected $btExportPageTypeColumns = array('ptID');
     protected $btExportPageFeedColumns = array('pfID');
     protected $btCacheBlockRecord = true;
+    protected $btCacheBlockOutput = null;
+    protected $btCacheBlockOutputOnPost = true;
+    protected $btCacheBlockOutputLifetime = 300;
     protected $list;
 
     /**
-     * Used for localization. If we want to localize the name/description we have to include this
+     * Used for localization. If we want to localize the name/description we have to include this.
      */
     public function getBlockTypeDescription()
     {
@@ -40,7 +43,7 @@ class Controller extends BlockController
     public function getJavaScriptStrings()
     {
         return array(
-            'feed-name' => t('Please give your RSS Feed a name.')
+            'feed-name' => t('Please give your RSS Feed a name.'),
         );
     }
 
@@ -76,6 +79,50 @@ class Controller extends BlockController
                 break;
         }
 
+        $today = date('Y-m-d');
+        $end = $start = null;
+
+        switch ($this->filterDateOption) {
+            case 'now':
+                $start = "$today 00:00:00";
+                $end = "$today 23:59:59";
+                break;
+
+            case 'past':
+                $end = "$today 23:59:59";
+
+                if ($this->filterDateDays > 0) {
+                    $past = date('Y-m-d', strtotime("-{$this->filterDateDays} days"));
+                    $start = "$past 00:00:00";
+                }
+                break;
+
+            case 'future':
+                $start = "$today 00:00:00";
+
+                if ($this->filterDateDays > 0) {
+                    $future = date('Y-m-d', strtotime("+{$this->filterDateDays} days"));
+                    $end = "$future 23:59:59";
+                }
+                break;
+
+            case 'between':
+                $start = "{$this->filterDateStart} 00:00:00";
+                $end = "{$this->filterDateEnd} 23:59:59";
+                break;
+
+            case 'all':
+            default:
+                break;
+        }
+
+        if ($start) {
+            $this->list->filterByPublicDate($start, '>=');
+        }
+        if ($end) {
+            $this->list->filterByPublicDate($end, '<=');
+        }
+
         $c = Page::getCurrentPage();
         if (is_object($c)) {
             $this->cID = $c->getCollectionID();
@@ -108,8 +155,12 @@ class Controller extends BlockController
             }
         }
 
-        $db = Loader::db();
-        $columns = $db->MetaColumnNames(CollectionAttributeKey::getIndexedSearchTable());
+        if ($this->filterByCustomTopic) {
+            $this->list->filterByTopic(intval($this->customTopicTreeNodeID));
+        }
+
+        $db = Database::connection();
+        $columns = $db->MetaColumnNames(CollectionAttributeKey::getDefaultIndexedSearchTable());
         if (in_array('ak_exclude_page_list', $columns)) {
             $this->list->filter(false, '(ak_exclude_page_list = 0 or ak_exclude_page_list is null)');
         }
@@ -129,7 +180,7 @@ class Controller extends BlockController
     public function view()
     {
         $list = $this->list;
-        $nh = Loader::helper('navigation');
+        $nh = Core::make('helper/navigation');
         $this->set('nh', $nh);
 
         if ($this->pfID) {
@@ -171,9 +222,9 @@ class Controller extends BlockController
 
     public function add()
     {
-
+        $this->requireAsset('core/topics');
         $c = Page::getCurrentPage();
-        $uh = Loader::helper('concrete/urls');
+        $uh = Core::make('helper/concrete/urls');
         $this->set('c', $c);
         $this->set('uh', $uh);
         $this->set('includeDescription', true);
@@ -186,12 +237,13 @@ class Controller extends BlockController
 
     public function edit()
     {
+        $this->requireAsset('core/topics');
         $b = $this->getBlockObject();
         $bCID = $b->getBlockCollectionID();
         $bID = $b->getBlockID();
         $this->set('bID', $bID);
         $c = Page::getCurrentPage();
-        if ($c->getCollectionID() != $this->cParentID && (!$this->cThis) && ($this->cParentID != 0)) {
+        if ((!$this->cThis) && ($this->cParentID != 0)) {
             $isOtherPage = true;
             $this->set('isOtherPage', true);
         }
@@ -201,7 +253,7 @@ class Controller extends BlockController
                 $this->set('rssFeed', $feed);
             }
         }
-        $uh = Loader::helper('concrete/urls');
+        $uh = Core::make('helper/concrete/urls');
         $this->set('uh', $uh);
         $this->set('bt', BlockType::getByHandle('page_list'));
         $this->set('featuredAttribute', CollectionAttributeKey::getByHandle('is_featured'));
@@ -212,7 +264,7 @@ class Controller extends BlockController
     protected function loadKeys()
     {
         $attributeKeys = array();
-        $keys = CollectionKey::getList(array('atHandle' => 'topics'));
+        $keys = CollectionKey::getList();
         foreach ($keys as $ak) {
             if ($ak->getAttributeTypeHandle() == 'topics') {
                 $attributeKeys[] = $ak;
@@ -223,11 +275,10 @@ class Controller extends BlockController
 
     public function action_filter_by_topic($treeNodeID = false, $topic = false)
     {
-        $db = Loader::db();
         if ($treeNodeID) {
-            $this->list->filterByTopic(intval($treeNodeID));
             $topicObj = Topic::getByID(intval($treeNodeID));
-            if (is_object($topicObj)) {
+            if (is_object($topicObj) && $topicObj instanceof Topic) {
+                $this->list->filterByTopic(intval($treeNodeID));
                 $seo = Core::make('helper/seo');
                 $seo->addTitleSegment($topicObj->getTreeNodeDisplayName());
             }
@@ -264,10 +315,10 @@ class Controller extends BlockController
             }
             $this->list->filterByPublicDate($start, '>=');
             $this->list->filterByPublicDate($end, '<=');
-            
+
             $seo = Core::make('helper/seo');
             $srv = Core::make('helper/date');
-            $seo->addTitleSegment($srv->date('F Y',$start));
+            $seo->addTitleSegment($srv->date('F Y', $start));
         }
         $this->view();
     }
@@ -303,13 +354,15 @@ class Controller extends BlockController
         } elseif ($parameters[0] == 'tag') {
             $method = 'action_filter_by_tag';
             $parameters = array_slice($parameters, 1);
-        } elseif (Loader::helper("validation/numbers")->integer($parameters[0])) {
+        } elseif (Core::make('helper/validation/numbers')->integer($parameters[0])) {
             // then we're going to treat this as a year.
             $method = 'action_filter_by_date';
             $parameters[0] = intval($parameters[0]);
             if (isset($parameters[1])) {
                 $parameters[1] = intval($parameters[1]);
             }
+        } else {
+            $parameters = $method = null;
         }
 
         return array($method, $parameters);
@@ -329,13 +382,30 @@ class Controller extends BlockController
         // If we've gotten to the process() function for this class, we assume that we're in
         // the clear, as far as permissions are concerned (since we check permissions at several
         // points within the dispatcher)
-        $db = Loader::db();
+        $db = Database::connection();
 
         $bID = $this->bID;
         $c = $this->getCollectionObject();
         if (is_object($c)) {
             $this->cID = $c->getCollectionID();
         }
+
+        $args = $args + array(
+            'enableExternalFiltering' => 0,
+            'includeAllDescendents' => 0,
+            'includeDate' => 0,
+            'truncateSummaries' => 0,
+            'displayFeaturedOnly' => 0,
+            'topicFilter' => '',
+            'displayThumbnail' => 0,
+            'displayAliases' => 0,
+            'truncateChars' => 0,
+            'paginate' => 0,
+            'rss' => 0,
+            'pfID' => 0,
+            'filterDateOption' => '',
+            'cParentID' => null,
+        );
 
         $args['num'] = ($args['num'] > 0) ? $args['num'] : 0;
         $args['cThis'] = ($args['cParentID'] == $this->cID) ? '1' : '0';
@@ -348,7 +418,8 @@ class Controller extends BlockController
         $args['includeDate'] = ($args['includeDate']) ? '1' : '0';
         $args['truncateSummaries'] = ($args['truncateSummaries']) ? '1' : '0';
         $args['displayFeaturedOnly'] = ($args['displayFeaturedOnly']) ? '1' : '0';
-        $args['filterByRelated'] = ($args['filterByRelated']) ? '1' : '0';
+        $args['filterByRelated'] = ($args['topicFilter'] == 'related') ? '1' : '0';
+        $args['filterByCustomTopic'] = ($args['topicFilter'] == 'custom') ? '1' : '0';
         $args['displayThumbnail'] = ($args['displayThumbnail']) ? '1' : '0';
         $args['displayAliases'] = ($args['displayAliases']) ? '1' : '0';
         $args['truncateChars'] = intval($args['truncateChars']);
@@ -356,8 +427,16 @@ class Controller extends BlockController
         $args['rss'] = intval($args['rss']);
         $args['ptID'] = intval($args['ptID']);
 
+        if (!$args['filterByRelated']) {
+            $args['relatedTopicAttributeKeyHandle'] = '';
+        }
+        if (!$args['filterByCustomTopic']) {
+            $args['customTopicAttributeKeyHandle'] = '';
+            $args['customTopicTreeNodeID'] = 0;
+        }
+
         if ($args['rss']) {
-            if ($this->pfID) {
+            if (isset($this->pfID) && $this->pfID) {
                 $pf = Feed::getByID($this->pfID);
             }
 
@@ -377,9 +456,9 @@ class Controller extends BlockController
             $pf->displayShortDescriptionContent();
             $pf->save();
             $args['pfID'] = $pf->getID();
-        } elseif ($this->pfID && !$args['rss']) {
+        } elseif (isset($this->pfID) && $this->pfID && !$args['rss']) {
             // let's make sure this isn't in use elsewhere.
-            $cnt = $db->GetOne('select count(pfID) from btPageList where pfID = ?', array($this->pfID));
+            $cnt = $db->fetchColumn('select count(pfID) from btPageList where pfID = ?', array($this->pfID));
             if ($cnt == 1) { // this is the last one, so we delete
                 $pf = Feed::getByID($this->pfID);
                 if (is_object($pf)) {
@@ -389,15 +468,27 @@ class Controller extends BlockController
             $args['pfID'] = 0;
         }
 
+        if ($args['filterDateOption'] != 'between') {
+            $args['filterDateStart'] = null;
+            $args['filterDateEnd'] = null;
+        }
+
+        if ($args['filterDateOption'] == 'past') {
+            $args['filterDateDays'] = $args['filterDatePast'];
+        } elseif ($args['filterDateOption'] == 'future') {
+            $args['filterDateDays'] = $args['filterDateFuture'];
+        } else {
+            $args['filterDateDays'] = null;
+        }
+
         $args['pfID'] = intval($args['pfID']);
         parent::save($args);
-
     }
 
     public function isBlockEmpty()
     {
         $pages = $this->get('pages');
-        if ($this->pageListTitle) {
+        if (isset($this->pageListTitle) && $this->pageListTitle) {
             return false;
         }
         if (count($pages) == 0) {
@@ -417,4 +508,16 @@ class Controller extends BlockController
         }
     }
 
+    public function cacheBlockOutput()
+    {
+        if ($this->btCacheBlockOutput === null) {
+            if (!$this->enableExternalFiltering && !$this->paginate) {
+                $this->btCacheBlockOutput = true;
+            } else {
+                $this->btCacheBlockOutput = false;
+            }
+        }
+
+        return  $this->btCacheBlockOutput;
+    }
 }

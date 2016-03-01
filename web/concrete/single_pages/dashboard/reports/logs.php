@@ -5,6 +5,11 @@ $th = Loader::helper('text');
 
 
 ?>
+<div class="ccm-dashboard-header-buttons">
+    <a id="ccm-export-results" class="btn btn-success" href="<?= $view->action('csv', $valt->generate())?>?<?=$query ?>">
+        <i class='fa fa-download'></i> <?= t('Export to CSV') ?>
+    </a>
+</div>
 
 <div class="ccm-dashboard-content-full">
 
@@ -33,9 +38,9 @@ $th = Loader::helper('text');
                 <div class="ccm-search-field-content">
                     <?=$form->select('channel', $channels)?>
                     <? if ($selectedChannel) { ?>
-                        <a href="<?=$controller->action('clear', $valt->generate(), $selectedChannel)?>" class="btn btn-default btn-sm"><?=tc('%s is a channel', 'Clear all in %s', Log::getChannelDisplayName($selectedChannel))?></a>
+                        <a href="<?=$controller->action('clear', $valt->generate(), $selectedChannel)?>" class="btn btn-default btn-danger"><?=tc('%s is a channel', 'Clear all in %s', Log::getChannelDisplayName($selectedChannel))?></a>
                     <? } else { ?>
-                        <a href="<?=$controller->action('clear', $valt->generate())?>" class="btn btn-default btn-sm"><?=t('Clear all')?></a>
+                        <a href="<?=$controller->action('clear', $valt->generate())?>" class="btn btn-default btn-danger"><?=t('Clear all')?></a>
                      <? } ?>
                 </div>
             </div>
@@ -60,7 +65,7 @@ $th = Loader::helper('text');
         <table class="ccm-search-results-table">
             <thead>
                 <tr>
-                    <th class="<?=$list->getSearchResultsClass('time')?>"><a href="<?=$list->getSortByURL('time', 'desc')?>"><?=t('Date/Time')?></a></th>
+                    <th class="<?=$list->getSearchResultsClass('logID')?>"><a href="<?=$list->getSortByURL('logID', 'desc')?>"><?=t('Date/Time')?></a></th>
                     <th class="<?=$list->getSearchResultsClass('level')?>"><a href="<?=$list->getSortByURL('level', 'desc')?>"><?=t('Level')?></a></th>
                     <th><span><?=t('Channel')?></span></th>
                     <th><span><?=t('User')?></span></th>

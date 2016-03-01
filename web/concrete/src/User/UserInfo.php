@@ -1,116 +1,91 @@
 <?php
+
 namespace Concrete\Core\User;
 
+use Concrete\Core\Application\Application;
+use Concrete\Core\Database\Connection\Connection;
+use Concrete\Core\Database\DatabaseManager;
 use Concrete\Core\File\StorageLocation\StorageLocation;
-use \Concrete\Core\Foundation\Object;
+use Concrete\Core\Foundation\Object;
+use Concrete\Core\Url\UrlInterface;
 use Concrete\Core\User\Event\AddUser;
 use Concrete\Core\User\PrivateMessage\Limit;
 use Concrete\Core\User\PrivateMessage\Mailbox as UserPrivateMessageMailbox;
 use Imagine\Image\ImageInterface;
 use Concrete\Flysystem\AdapterInterface;
 use Concrete\Core\Mail\Importer\MailImporter;
-use Loader;
 use View;
 use Config;
 use Events;
 use User as ConcreteUser;
 use UserAttributeKey;
-use \Concrete\Core\Attribute\Value\UserValue as UserAttributeValue;
-use \Concrete\Core\Attribute\Key\Key as AttributeKey;
+use Concrete\Core\Attribute\Value\UserValue as UserAttributeValue;
 use Group;
-use \Hautelook\Phpass\PasswordHash;
+use Hautelook\Phpass\PasswordHash;
 use Session;
 use Core;
+use Database;
+use Concrete\Core\User\Avatar\AvatarServiceInterface;
 
 class UserInfo extends Object implements \Concrete\Core\Permission\ObjectInterface
 {
+
+    protected $avatarService;
+    protected $application;
+    protected $connection;
+
+    public function __construct(Connection $connection, Application $application, AvatarServiceInterface $avatarService)
+    {
+        $this->avatarService = $avatarService;
+        $this->application = $application;
+        $this->connection = $connection;
+    }
+    /**
+     * @return string
+     */
     public function __toString()
     {
         return 'UserInfo: ' . $this->getUserID();
     }
 
-    public function getPermissionObjectIdentifier() {return $this->uID;}
+    /**
+     * @return int
+     */
+    public function getPermissionObjectIdentifier()
+    {
+        return $this->uID;
+    }
 
+    /**
+     * @return string
+     */
     public function getPermissionResponseClassName()
     {
         return '\\Concrete\\Core\\Permission\\Response\\UserInfoResponse';
     }
 
+    /**
+     * @return string|false
+     */
     public function getPermissionAssignmentClassName()
     {
         return false;
     }
+
+    /**
+     * @return string|false
+     */
     public function getPermissionObjectKeyCategoryHandle()
     {
         return false;
     }
 
-    /* magic method for user attributes. This is db expensive but pretty damn cool */
-    // so if the attrib handle is "my_attribute", then get the attribute with $ui->getUserMyAttribute(), or "uFirstName" become $ui->getUserUfirstname();
-    public function __call($nm, $a)
-    {
-        if (substr($nm, 0, 7) == 'getUser') {
-            $nm = preg_replace('/(?!^)[[:upper:]]/','_\0', $nm);
-            $nm = strtolower($nm);
-            $nm = str_replace('get_user_', '', $nm);
-
-            return $this->getAttribute($nm);
-        }
-    }
-
     /**
-     * returns the UserInfo object for a give user's uID
-     * @param int $uID
-     * @return UserInfo
+     * @return Group[]
      */
-    public static function getByID($uID)
-    {
-        return UserInfo::get('where uID = ?', $uID);
-    }
-
-    /**
-     * returns the UserInfo object for a give user's username
-     * @param string $uName
-     * @return UserInfo
-     */
-    public static function getByUserName($uName)
-    {
-        return UserInfo::get('where uName = ?', $uName);
-    }
-
-    /**
-     * returns the UserInfo object for a give user's email address
-     * @param string $uEmail
-     * @return UserInfo
-     */
-    public static function getByEmail($uEmail)
-    {
-        return UserInfo::get('where uEmail = ?', $uEmail);
-    }
-
-    /**
-     * @param string $uHash
-     * @param boolean $unredeemedHashesOnly
-     * @return UserInfo
-     */
-    public static function getByValidationHash($uHash, $unredeemedHashesOnly = true)
-    {
-        $db = Loader::db();
-        if ($unredeemedHashesOnly) {
-            $uID = $db->GetOne("select uID from UserValidationHashes where uHash = ? and uDateRedeemed = 0", array($uHash));
-        } else {
-            $uID = $db->GetOne("select uID from UserValidationHashes where uHash = ?", array($uHash));
-        }
-        if ($uID) {
-            $ui = UserInfo::getByID($uID);
-
-            return $ui;
-        }
-    }
-
     public function getUserBadges()
     {
-        $db = Loader::db();
+        $db = $this->connection;
         $groups = array();
         $r = $db->Execute('select g.gID from Groups g inner join UserGroups ug on g.gID = ug.gID where g.gIsBadge = 1 and ug.uID = ? order by ugEntered desc', array($this->getUserID()));
         while ($row = $r->FetchRow()) {
@@ -120,107 +95,9 @@ class UserInfo extends Object implements \Concrete\Core\Permission\ObjectInterfa
         return $groups;
     }
 
-    private function get($where, $var)
-    {
-        $db = Loader::db();
-        $q = "select Users.uID, Users.uLastLogin, Users.uLastIP, Users.uIsValidated, Users.uPreviousLogin, Users.uIsFullRecord, Users.uNumLogins, Users.uDateAdded, Users.uIsActive, Users.uDefaultLanguage, Users.uLastOnline, Users.uHasAvatar, Users.uName, Users.uEmail, Users.uPassword, Users.uTimezone, Users.uLastPasswordChange from Users " . $where;
-        $r = $db->query($q, array($var));
-        if ($r && $r->numRows() > 0) {
-            $ui = new UserInfo();
-            $row = $r->fetchRow();
-            $ui->setPropertiesFromArray($row);
-            $r->free();
-        }
-
-        if (is_object($ui)) {
-            return $ui;
-        }
-    }
 
     /**
-     * @param array $data
-     * @return UserInfo
-     */
-    public static function add($data)
-    {
-
-        $uae = new AddUser($data);
-        $uae = Events::dispatch('on_before_user_add', $uae);
-        if (!$uae->proceed()) {
-            return false;
-        }
-
-        $db = Loader::db();
-        $dh = Loader::helper('date');
-        $uDateAdded = $dh->getOverridableNow();
-        $hasher = new PasswordHash(Config::get('concrete.user.password.hash_cost_log2'), Config::get('concrete.user.password.hash_portable'));
-
-        if ($data['uIsValidated'] == 1) {
-            $uIsValidated = 1;
-        } elseif (isset($data['uIsValidated']) && $data['uIsValidated'] == 0) {
-            $uIsValidated = 0;
-        } else {
-            $uIsValidated = -1;
-        }
-
-        if (isset($data['uIsFullRecord']) && $data['uIsFullRecord'] == 0) {
-            $uIsFullRecord = 0;
-        } else {
-            $uIsFullRecord = 1;
-        }
-
-        $password_to_insert = $data['uPassword'];
-        $hash = $hasher->HashPassword($password_to_insert);
-
-        if (isset($data['uDefaultLanguage']) && $data['uDefaultLanguage'] != '') {
-            $uDefaultLanguage = $data['uDefaultLanguage'];
-        }
-        $v = array($data['uName'], $data['uEmail'], $hash, $uIsValidated, $uDateAdded, $uDateAdded, $uIsFullRecord, $uDefaultLanguage, 1);
-        $r = $db->prepare("insert into Users (uName, uEmail, uPassword, uIsValidated, uDateAdded, uLastPasswordChange, uIsFullRecord, uDefaultLanguage, uIsActive) values (?, ?, ?, ?, ?, ?, ?, ?, ?)");
-        $res = $db->execute($r, $v);
-        if ($res) {
-            $newUID = $db->Insert_ID();
-            $ui = UserInfo::getByID($newUID);
-
-            if (is_object($ui)) {
-
-                $uo = $ui->getUserObject();
-                $groupControllers = \Group::getAutomatedOnRegisterGroupControllers($uo);
-                foreach($groupControllers as $ga) {
-                    if ($ga->check($uo)) {
-                        $uo->enterGroup($ga->getGroupObject());
-                    }
-                }
-
-                // run any internal event we have for user add
-                $ue = new \Concrete\Core\User\Event\UserInfoWithPassword($ui);
-                $ue->setUserPassword($data['uPassword']);
-                Events::dispatch('on_user_add', $ue);
-            }
-
-            return $ui;
-        }
-    }
-
-    public function addSuperUser($uPasswordEncrypted, $uEmail)
-    {
-        $db = Loader::db();
-        $dh = Loader::helper('date');
-        $uDateAdded = $dh->getOverridableNow();
-
-        $v = array(USER_SUPER_ID, USER_SUPER, $uEmail, $uPasswordEncrypted, 1, $uDateAdded, $uDateAdded);
-        $r = $db->prepare("insert into Users (uID, uName, uEmail, uPassword, uIsActive, uDateAdded, uLastPasswordChange) values (?, ?, ?, ?, ?, ?, ?)");
-        $res = $db->execute($r, $v);
-        if ($res) {
-            $newUID = $db->Insert_ID();
-
-            return UserInfo::getByID($newUID);
-        }
-    }
-
-    /**
-     * Deletes a user
-     * @return void
+     * Deletes a user.
      */
     public function delete()
     {
@@ -237,7 +114,7 @@ class UserInfo extends Object implements \Concrete\Core\Permission\ObjectInterfa
             return false;
         }
 
-        $db = Loader::db();
+        $db = $this->connection;
 
         $r = $db->Execute('select avID, akID from UserAttributeValues where uID = ?', array($this->uID));
         while ($row = $r->FetchRow()) {
@@ -248,38 +125,33 @@ class UserInfo extends Object implements \Concrete\Core\Permission\ObjectInterfa
             }
         }
 
-        $r = $db->query("DELETE FROM UserSearchIndexAttributes WHERE uID = ?",array(intval($this->uID)) );
+        $r = $db->query("DELETE FROM OauthUserMap WHERE user_id = ?", array(intval($this->uID)));
 
-        $r = $db->query("DELETE FROM UserGroups WHERE uID = ?",array(intval($this->uID)) );
-        $r = $db->query("DELETE FROM Users WHERE uID = ?",array(intval($this->uID)));
-        $r = $db->query("DELETE FROM UserValidationHashes WHERE uID = ?",array(intval($this->uID)));
+        $r = $db->query("DELETE FROM UserSearchIndexAttributes WHERE uID = ?", array(intval($this->uID)));
 
-        $r = $db->query("DELETE FROM Piles WHERE uID = ?",array(intval($this->uID)));
+        $r = $db->query("DELETE FROM UserGroups WHERE uID = ?", array(intval($this->uID)));
+        $r = $db->query("DELETE FROM Users WHERE uID = ?", array(intval($this->uID)));
+        $r = $db->query("DELETE FROM UserValidationHashes WHERE uID = ?", array(intval($this->uID)));
 
-        $r = $db->query("UPDATE Blocks set uID=? WHERE uID = ?",array( intval(USER_SUPER_ID), intval($this->uID)));
-        $r = $db->query("UPDATE Pages set uID=? WHERE uID = ?",array( intval(USER_SUPER_ID), intval($this->uID)));
+        $r = $db->query("DELETE FROM Piles WHERE uID = ?", array(intval($this->uID)));
+
+        $r = $db->query("UPDATE Blocks set uID=? WHERE uID = ?", array(intval(USER_SUPER_ID), intval($this->uID)));
+        $r = $db->query("UPDATE Pages set uID=? WHERE uID = ?", array(intval(USER_SUPER_ID), intval($this->uID)));
     }
 
     /**
-     * Called only by the getGroupMembers function it sets the "type" of member for this group. Typically only used programmatically
-     * @param string $type
-     * @return void
+     * @param \Concrete\Core\User\PrivateMessage\PrivateMessage $msg
+     *
+     * @return bool
      */
-    public function setGroupMemberType($type)
-    {
-        $this->gMemberType = $type;
-    }
-
-    public function getGroupMemberType()
-    {
-        return $this->gMemberType;
-    }
-
     public function canReadPrivateMessage($msg)
     {
         return $msg->getMessageUserID() == $this->getUserID();
     }
 
+    /**
+     * @param ImageInterface $image
+     */
     public function updateUserAvatar(ImageInterface $image)
     {
         $fsl = StorageLocation::getDefault()->getFileSystemObject();
@@ -294,20 +166,33 @@ class UserInfo extends Object implements \Concrete\Core\Permission\ObjectInterfa
             $image,
             array(
                 'visibility' => AdapterInterface::VISIBILITY_PUBLIC,
-                'mimetype' => 'image/jpeg'
+                'mimetype' => 'image/jpeg',
             )
         );
 
-        $db = Loader::db();
+        $db = $this->connection;
         $db->query("update Users set uHasAvatar = 1 where uID = ?", array($this->getUserID()));
+
+        // run any internal event we have for user update
+        $ui = self::getByID($this->uID);
+        $ue = new \Concrete\Core\User\Event\UserInfo($ui);
+        Events::dispatch('on_user_update', $ue);
     }
 
+    /**
+     * @param UserInfo $recipient
+     * @param string $subject
+     * @param string $text
+     * @param \Concrete\Core\User\PrivateMessage\PrivateMessage $inReplyTo
+     *
+     * @return \Concrete\Core\Error\Error|false|null
+     */
     public function sendPrivateMessage($recipient, $subject, $text, $inReplyTo = false)
     {
         if (Limit::isOverLimit($this->getUserID())) {
             return Limit::getErrorObject();
         }
-        $antispam = Loader::helper('validation/antispam');
+        $antispam = Core::make('helper/validation/antispam');
         $messageText = t('Subject: %s', $subject);
         $messageText .= "\n";
         $messageText .= t('Message: %s', $text);
@@ -318,9 +203,10 @@ class UserInfo extends Object implements \Concrete\Core\Permission\ObjectInterfa
         }
 
         $subject = ($subject == '') ? t('(No Subject)') : $subject;
-        $db = Loader::db();
-        $dt = Loader::helper('date');
-        $v = array($this->getUserID(), $dt->getOverridableNow(), $subject, $text, $recipient->getUserID());
+        $db = $this->connection;
+        $dt = Core::make('helper/date');
+        $msgDateCreated = $dt->getOverridableNow();
+        $v = array($this->getUserID(), $msgDateCreated, $subject, $text, $recipient->getUserID());
         $db->Execute('insert into UserPrivateMessages (uAuthorID, msgDateCreated, msgSubject, msgBody, uToID) values (?, ?, ?, ?, ?)', $v);
 
         $msgID = $db->Insert_ID();
@@ -340,21 +226,21 @@ class UserInfo extends Object implements \Concrete\Core\Permission\ObjectInterfa
 
         // send the email notification
         if ($recipient->getAttribute('profile_private_messages_notification_enabled')) {
-            $mh = Loader::helper('mail');
+            $mh = Core::make('mail');
             $mh->addParameter('msgSubject', $subject);
             $mh->addParameter('msgBody', $text);
             $mh->addParameter('msgAuthor', $this->getUserName());
             $mh->addParameter('msgDateCreated', $msgDateCreated);
-            $mh->addParameter('profileURL', BASE_URL . View::url('/members/profile', 'view', $this->getUserID()));
-            $mh->addParameter('profilePreferencesURL', BASE_URL . View::url('/account/profile/edit'));
+            $mh->addParameter('profileURL', $this->getUserPublicProfileUrl());
+            $mh->addParameter('profilePreferencesURL', View::url('/account/profile/edit'));
             $mh->to($recipient->getUserEmail());
-            $mh->addParameter('siteName', Config::get('concrete.site'));
+            $mh->addParameter('siteName', tc('SiteName', Config::get('concrete.site')));
 
             $mi = MailImporter::getByHandle("private_message");
             if (is_object($mi) && $mi->isMailImporterEnabled()) {
                 $mh->load('private_message_response_enabled');
                 // we store information ABOUT the message here. The mail handler has to know how to handle this.
-                $data = new stdClass();
+                $data = new \stdClass();
                 $data->msgID = $msgID;
                 $data->toUID = $recipient->getUserID();
                 $data->fromUID = $this->getUserID();
@@ -367,7 +253,8 @@ class UserInfo extends Object implements \Concrete\Core\Permission\ObjectInterfa
     }
 
     /**
-     * gets the user object of the current UserInfo object ($this)
+     * Gets the User object of the current UserInfo object ($this).
+     *
      * @return User
      */
     public function getUserObject()
@@ -379,8 +266,442 @@ class UserInfo extends Object implements \Concrete\Core\Permission\ObjectInterfa
     }
 
     /**
-     * Sets the attribute of a user info object to the specified value, and saves it in the database
-    */
+     * @param array $data
+     *
+     * @return bool|null
+     */
+    public function update($data)
+    {
+        $db = $this->connection;
+        if ($this->uID) {
+            $ux = $this->getUserObject();
+            $uName = $this->getUserName();
+            $uEmail = $this->getUserEmail();
+            $uHasAvatar = $this->hasAvatar();
+            $uTimezone = $this->getUserTimezone();
+            $uDefaultLanguage = $ux->getUserDefaultLanguage();
+            if (isset($data['uName'])) {
+                $uName = $data['uName'];
+            }
+            $emailChanged = false;
+            if (isset($data['uEmail'])) {
+                if ($uEmail != $data['uEmail']) {
+                    $emailChanged = true;
+                }
+                $uEmail = $data['uEmail'];
+            }
+            if (isset($data['uHasAvatar'])) {
+                $uHasAvatar = $data['uHasAvatar'];
+            }
+            if (isset($data['uTimezone'])) {
+                $uTimezone = $data['uTimezone'];
+            }
+            if (isset($data['uDefaultLanguage']) && $data['uDefaultLanguage'] != '') {
+                $uDefaultLanguage = $data['uDefaultLanguage'];
+            }
+
+            $testChange = false;
+
+            if (isset($data['uPassword']) && $data['uPassword'] != null) {
+                if ($data['uPassword'] == $data['uPasswordConfirm']) {
+                    $dh = Core::make('helper/date');
+                    $dateTime = $dh->getOverridableNow();
+                    $v = array($uName, $uEmail, $this->getUserObject()->getUserPasswordHasher()->HashPassword($data['uPassword']), $uHasAvatar ? 1 : 0, $uTimezone, $uDefaultLanguage, $dateTime, $this->uID);
+                    $r = $db->prepare("update Users set uName = ?, uEmail = ?, uPassword = ?, uHasAvatar = ?, uTimezone = ?, uDefaultLanguage = ?, uLastPasswordChange = ? where uID = ?");
+                    $res = $db->execute($r, $v);
+
+                    $testChange = true;
+
+                    $currentUser = new User();
+                    $session = Core::make('session');
+                    if ($currentUser->isLoggedIn() && $currentUser->getUserID() == $session->get('uID')) {
+                        $session->set('uLastPasswordChange', $dateTime);
+                    }
+                }
+            } else {
+                $v = array($uName, $uEmail, $uHasAvatar ? 1 : 0, $uTimezone, $uDefaultLanguage, $this->uID);
+                $r = $db->prepare("update Users set uName = ?, uEmail = ?, uHasAvatar = ?, uTimezone = ?, uDefaultLanguage = ? where uID = ?");
+                $res = $db->execute($r, $v);
+            }
+
+            if ($emailChanged) {
+                $db->query("DELETE FROM UserValidationHashes WHERE uID = ?", array(intval($this->uID)));
+            }
+
+            // now we check to see if the user is updated his or her own logged in record
+            $session = Core::make('session');
+            if ($session->has('uID') && ($session->get('uID') == $this->uID)) {
+                $session->set('uName', $uName);
+                $session->set('uTimezone', $uTimezone);
+                $session->set('uDefaultLanguage', $uDefaultLanguage);
+            }
+
+            // run any internal event we have for user update
+            $ui = self::getByID($this->uID);
+            $ue = new \Concrete\Core\User\Event\UserInfo($ui);
+            Events::dispatch('on_user_update', $ue);
+
+            if ($testChange) {
+                $ue = new \Concrete\Core\User\Event\UserInfoWithPassword($ui);
+                Events::dispatch('on_user_change_password', $ue);
+            }
+
+            return $res;
+        }
+    }
+
+    /**
+     * @param int[] $groupArray
+     */
+    public function updateGroups($groupArray)
+    {
+        $db = $this->connection;
+        $q = "select gID from UserGroups where uID = '{$this->uID}'";
+        $r = $db->query($q);
+        if ($r) {
+            $existingGIDArray = array();
+            while ($row = $r->fetchRow()) {
+                $existingGIDArray[] = $row['gID'];
+            }
+        }
+
+        if (is_array($groupArray)) {
+            foreach ($groupArray as $gID) {
+                $key = array_search($gID, $existingGIDArray);
+                if ($key !== false) {
+                    // we remove this item from the existing GID array
+                    unset($existingGIDArray[$key]);
+                } else {
+                    // this item is new, so we add it.
+                    $_ux = $this->getUserObject();
+                    $g = Group::getByID($gID);
+                    $_ux->enterGroup($g);
+                }
+            }
+        }
+
+        // now we go through the existing GID Array, and remove everything, since whatever is left is not wanted.
+
+        // Fire on_user_exit_group event for each group exited
+        foreach ($existingGIDArray as $gID) {
+            $group = Group::getByID($gID);
+            if ($group) {
+                $ue = new \Concrete\Core\User\Event\UserGroup($this->getUserObject());
+                $ue->setGroupObject($group);
+                Events::dispatch('on_user_exit_group', $ue);
+            }
+        }
+
+        // Remove from db
+        if (count($existingGIDArray) > 0) {
+            $inStr = implode(',', $existingGIDArray);
+            $q2 = "delete from UserGroups where uID = '{$this->uID}' and gID in ({$inStr})";
+            $db->query($q2);
+            // fire the user group removal event for each of the groups we've deleted
+            foreach ($existingGIDArray as $gID) {
+                $ue = new \Concrete\Core\User\Event\UserGroup($this->getUserObject());
+                $ue->setGroupObject(Group::getByID($gID));
+                Events::dispatch('on_user_exit_group', $ue);
+            }
+        }
+    }
+
+    /**
+     * @return string
+     */
+    public function setupValidation()
+    {
+        $db = $this->connection;
+        $hash = $db->GetOne("select uHash from UserValidationHashes where uID = ? order by uDateGenerated desc", array($this->uID));
+        if ($hash) {
+            return $hash;
+        } else {
+            $h = Core::make('helper/validation/identifier');
+            $hash = $h->generate('UserValidationHashes', 'uHash');
+            $db->Execute("insert into UserValidationHashes (uID, uHash, uDateGenerated) values (?, ?, ?)", array($this->uID, $hash, time()));
+
+            return $hash;
+        }
+    }
+
+    /**
+     * @return true
+     */
+    public function markValidated()
+    {
+        $db = $this->connection;
+        $v = array($this->uID);
+        $db->query("update Users set uIsValidated = 1, uIsFullRecord = 1 where uID = ?", $v);
+        $db->query("update UserValidationHashes set uDateRedeemed = " . time() . " where uID = ?", $v);
+
+        $ue = new \Concrete\Core\User\Event\UserInfo($this);
+        Events::dispatch('on_user_validate', $ue);
+
+        return true;
+    }
+
+    /**
+     * @param string $newPassword
+     *
+     * @return bool
+     */
+    public function changePassword($newPassword)
+    {
+        $db = $this->connection;
+        if ($this->uID) {
+            $dh = Core::make('helper/date');
+            $dateTime = $dh->getOverridableNow();
+            $v = array(
+                $this->getUserObject()->getUserPasswordHasher()->HashPassword($newPassword),
+                $dateTime,
+                $this->uID,
+            );
+            $q = "update Users set uPassword = ?, uLastPasswordChange = ?  where uID = ?";
+            $r = $db->prepare($q);
+            $res = $db->execute($r, $v);
+
+            $ue = new \Concrete\Core\User\Event\UserInfoWithPassword($this);
+            $ue->setUserPassword($newPassword);
+
+            $currentUser = new User();
+            $session = Core::make('session');
+            if ($currentUser->isLoggedIn() && $currentUser->getUserID() == $session->get('uID')) {
+                $session->set('uLastPasswordChange', $dateTime);
+            }
+
+            Events::dispatch('on_user_change_password', $ue);
+
+            return $res;
+        }
+    }
+
+    /**
+     */
+    public function activate()
+    {
+        $db = $this->connection;
+        $q = "update Users set uIsActive = 1 where uID = '{$this->uID}'";
+        $db->query($q);
+        $ue = new \Concrete\Core\User\Event\UserInfo($this);
+        Events::dispatch('on_user_activate', $ue);
+    }
+
+    /**
+     */
+    public function deactivate()
+    {
+        $db = $this->connection;
+        $q = "update Users set uIsActive = 0 where uID = '{$this->uID}'";
+        $db->query($q);
+        $ue = new \Concrete\Core\User\Event\UserInfo($this);
+        Events::dispatch('on_user_deactivate', $ue);
+    }
+
+    /**
+     * @return string
+     */
+    public function resetUserPassword()
+    {
+        // resets user's password, and returns the value of the reset password
+        if ($this->uID > 0) {
+            $newPassword = '';
+            $chars = "abcdefghijklmnpqrstuvwxyzABCDEFGHIJKLMNPQRSTUVWXYZ123456789";
+            for ($i = 0; $i < 7; $i++) {
+                $newPassword .= substr($chars, rand() % strlen($chars), 1);
+            }
+            $this->changePassword($newPassword);
+
+            return $newPassword;
+        }
+    }
+
+    public function getUserAvatar()
+    {
+        return $this->avatarService->getAvatar($this);
+    }
+
+    /**
+     * @return null|Concrete\Core\Url\UrlInterface
+     */
+    public function getUserPublicProfileUrl()
+    {
+        if (!$this->application['config']->get('concrete.user.profiles_enabled')) {
+            return null;
+        }
+        $url = $this->application->make('url/manager');
+        return $url->resolve(array(
+            '/members/profile',
+            'view',
+            $this->getUserID()
+            )
+        );
+    }
+
+    /**
+     * @return bool
+     */
+    public function hasAvatar()
+    {
+        return $this->avatarService->userHasAvatar($this);
+    }
+
+    /**
+     * @return int
+     */
+    public function getLastLogin()
+    {
+        return $this->uLastLogin;
+    }
+
+    /**
+     * @return string|null
+     */
+    public function getLastIPAddress()
+    {
+        $ip = new \Concrete\Core\Utility\IPAddress($this->uLastIP, true);
+
+        return $ip->getIp($ip::FORMAT_IP_STRING);
+    }
+
+    /**
+     * @return int
+     */
+    public function getPreviousLogin()
+    {
+        return $this->uPreviousLogin;
+    }
+
+    /**
+     * @return bool
+     */
+    public function isActive()
+    {
+        return $this->uIsActive;
+    }
+
+    /**
+     * @return bool
+     */
+    public function isValidated()
+    {
+        return $this->uIsValidated;
+    }
+
+    /**
+     * @return bool
+     */
+    public function isFullRecord()
+    {
+        return $this->uIsFullRecord;
+    }
+
+    /**
+     * @return int
+     */
+    public function getNumLogins()
+    {
+        return $this->uNumLogins;
+    }
+
+    /**
+     * @return int
+     */
+    public function getUserID()
+    {
+        return $this->uID;
+    }
+
+    /**
+     * @return string
+     */
+    public function getUserName()
+    {
+        return $this->uName;
+    }
+
+    /**
+     * @return string
+     */
+    public function getUserDisplayName()
+    {
+        return $this->getUserName();
+    }
+
+    /**
+     * @return string
+     */
+    public function getUserPassword()
+    {
+        return $this->uPassword;
+    }
+
+    /**
+     * @return string
+     */
+    public function getUserEmail()
+    {
+        return $this->uEmail;
+    }
+
+    /**
+     * Returns the user's timezone.
+     *
+     * @return string
+     */
+    public function getUserTimezone()
+    {
+        return $this->uTimezone;
+    }
+
+    /**
+     * @return string
+     */
+    public function getUserDefaultLanguage()
+    {
+        return $this->uDefaultLanguage;
+    }
+
+    /**
+     * Gets the date a user was added to the system.
+     *
+     * @return string date formated like: 2009-01-01 00:00:00
+     */
+    public function getUserDateAdded()
+    {
+        return $this->uDateAdded;
+    }
+
+    /**
+     * Gets the date a user was last active on the site.
+     *
+     * @return string date formated like: 2009-01-01 00:00:00
+     */
+    public function getLastOnline()
+    {
+        return $this->uLastOnline;
+    }
+
+    /**
+     * @param UserAttributeKey[] $attributes
+     */
+    public function saveUserAttributesForm($attributes)
+    {
+        foreach ($attributes as $uak) {
+            $uak->saveAttributeForm($this);
+        }
+
+        $ue = new \Concrete\Core\User\Event\UserInfoWithAttributes($this);
+        $ue->setAttributes($attributes);
+        Events::dispatch('on_user_attributes_saved', $ue);
+    }
+
+
+    /**
+     * Sets the attribute of a user info object to the specified value, and saves it in the database.
+     *
+     * @param UserAttributeKey|string $ak
+     * @param mixed $value
+     */
     public function setAttribute($ak, $value)
     {
         if (!is_object($ak)) {
@@ -390,9 +711,11 @@ class UserInfo extends Object implements \Concrete\Core\Permission\ObjectInterfa
         $this->reindex();
     }
 
+    /**
+     * @param UserAttributeKey|string $ak
+     */
     public function clearAttribute($ak)
     {
-        $db = Loader::db();
         if (!is_object($ak)) {
             $ak = UserAttributeKey::getByHandle($ak);
         }
@@ -405,7 +728,6 @@ class UserInfo extends Object implements \Concrete\Core\Permission\ObjectInterfa
 
     /**
      * Reindex the attributes on this file.
-     * @return void
      */
     public function reindex()
     {
@@ -413,7 +735,7 @@ class UserInfo extends Object implements \Concrete\Core\Permission\ObjectInterfa
             $this->getUserID(),
             'getSearchIndexValue'
         );
-        $db = Loader::db();
+        $db = $this->connection;
 
         $db->Execute('delete from UserSearchIndexAttributes where uID = ?', array($this->getUserID()));
         $searchableAttributes = array('uID' => $this->getUserID());
@@ -423,7 +745,12 @@ class UserInfo extends Object implements \Concrete\Core\Permission\ObjectInterfa
     }
 
     /**
-     * Gets the value of the attribute for the user
+     * Gets the value of the attribute for the user.
+     *
+     * @param UserAttributeKey|string $ak
+     * @param string|false $displayMode
+     *
+     * @return mixed|null
      */
     public function getAttribute($ak, $displayMode = false)
     {
@@ -445,6 +772,9 @@ class UserInfo extends Object implements \Concrete\Core\Permission\ObjectInterfa
         }
     }
 
+    /**
+     * @param UserAttributeKey|string $ak
+     */
     public function getAttributeField($ak)
     {
         if (!is_object($ak)) {
@@ -454,10 +784,19 @@ class UserInfo extends Object implements \Concrete\Core\Permission\ObjectInterfa
         $ak->render('form', $value);
     }
 
+    /**
+     * @param UserAttributeKey|string $ak
+     * @param bool $createIfNotFound
+     *
+     * @return \Concrete\Core\Attribute\Value\UserValue|false
+     */
     public function getAttributeValueObject($ak, $createIfNotFound = false)
     {
-        $db = Loader::db();
+        $db = $this->connection;
         $av = false;
+        if (!is_object($ak)) {
+            $ak = UserAttributeKey::getByHandle($ak);
+        }
         $v = array($this->getUserID(), $ak->getAttributeKeyID());
         $avID = $db->GetOne("select avID from UserAttributeValues where uID = ? and akID = ?", $v);
         if ($avID > 0) {
@@ -486,364 +825,77 @@ class UserInfo extends Object implements \Concrete\Core\Permission\ObjectInterfa
         return $av;
     }
 
-    public function update($data)
+    /**
+     * Magic method for user attributes. This is db expensive but pretty damn cool
+     * so if the attrib handle is "my_attribute", then get the attribute with $ui->getUserMyAttribute(), or "uFirstName" become $ui->getUserUfirstname();.
+     * @return mixed|null
+     */
+    public function __call($nm, $a)
     {
-        $db = Loader::db();
-        if ($this->uID) {
-            $ux = $this->getUserObject();
-            $uName = $this->getUserName();
-            $uEmail = $this->getUserEmail();
-            $uHasAvatar = $this->hasAvatar();
-            $uTimezone = $this->getUserTimezone();
-            $uDefaultLanguage = $ux->getUserDefaultLanguage();
-            if (isset($data['uName'])) {
-                $uName = $data['uName'];
-            }
-            if (isset($data['uEmail'])) {
-                $uEmail = $data['uEmail'];
-            }
-            if (isset($data['uHasAvatar'])) {
-                $uHasAvatar = $data['uHasAvatar'];
-            }
-            if ( isset($data['uTimezone'])) {
-                $uTimezone = $data['uTimezone'];
-            }
-            if (isset($data['uDefaultLanguage']) && $data['uDefaultLanguage'] != '') {
-                $uDefaultLanguage = $data['uDefaultLanguage'];
-            }
+        if (substr($nm, 0, 7) == 'getUser') {
+            $nm = preg_replace('/(?!^)[[:upper:]]/', '_\0', $nm);
+            $nm = strtolower($nm);
+            $nm = str_replace('get_user_', '', $nm);
 
-            $testChange = false;
-
-            if ($data['uPassword'] != null) {
-                if ($data['uPassword'] == $data['uPasswordConfirm']) {
-
-                    $dh = Loader::helper('date');
-                    $dateTime = $dh->getOverridableNow();
-                    $v = array($uName, $uEmail, $this->getUserObject()->getUserPasswordHasher()->HashPassword($data['uPassword']), $uHasAvatar, $uTimezone, $uDefaultLanguage, $dateTime, $this->uID);
-                    $r = $db->prepare("update Users set uName = ?, uEmail = ?, uPassword = ?, uHasAvatar = ?, uTimezone = ?, uDefaultLanguage = ?, uLastPasswordChange = ? where uID = ?");
-                    $res = $db->execute($r, $v);
-
-                    $testChange = true;
-
-                    $currentUser = new User();
-                    $session = Core::make('session');
-                    if($currentUser->isLoggedIn() && $currentUser->getUserID() == $session->get('uID')) {
-                        $session->set('uLastPasswordChange', $dateTime);
-                    }
-
-                } else {
-                    $updateGroups = false;
-                }
-            } else {
-                $v = array($uName, $uEmail, $uHasAvatar, $uTimezone, $uDefaultLanguage, $this->uID);
-                $r = $db->prepare("update Users set uName = ?, uEmail = ?, uHasAvatar = ?, uTimezone = ?, uDefaultLanguage = ? where uID = ?");
-                $res = $db->execute($r, $v);
-            }
-
-            // now we check to see if the user is updated his or her own logged in record
-            $session = Core::make('session');
-            if ($session->has('uID') && ($session->get('uID') == $this->uID)) {
-                $session->set('uName', $uName);
-                $session->set('uTimezone', $uTimezone);
-                $session->set('uDefaultLanguage', $uDefaultLanguage);
-            }
-
-            // run any internal event we have for user update
-            $ui = UserInfo::getByID($this->uID);
-            $ue = new \Concrete\Core\User\Event\UserInfo($ui);
-            Events::dispatch('on_user_update', $ue);
-
-            if ($testChange) {
-                $ue = new \Concrete\Core\User\Event\UserInfoWithPassword($ui);
-                Events::dispatch('on_user_change_password', $ue);
-            }
-
-            return $res;
+            return $this->getAttribute($nm);
         }
     }
 
-    public function updateGroups($groupArray)
+
+    /**
+     * @deprecated
+     */
+    public static function add($data)
     {
-        $db = Loader::db();
-        $q = "select gID from UserGroups where uID = '{$this->uID}'";
-        $r = $db->query($q);
-        if ($r) {
-            $existingGIDArray = array();
-            while ($row = $r->fetchRow()) {
-                $existingGIDArray[] = $row['gID'];
-            }
-        }
-
-        $dh = Loader::helper('date');
-
-        $datetime = $dh->getOverridableNow();
-        if (is_array($groupArray)) {
-            foreach ($groupArray as $gID) {
-                $key = array_search($gID, $existingGIDArray);
-                if ($key !== false) {
-                    // we remove this item from the existing GID array
-                    unset($existingGIDArray[$key]);
-                } else {
-                    // this item is new, so we add it.
-                    $_ux = $this->getUserObject();
-                    $g = Group::getByID($gID);
-                    $_ux->enterGroup($g);
-                }
-            }
-        }
-
-
-        // now we go through the existing GID Array, and remove everything, since whatever is left is not wanted.
-
-        // Fire on_user_exit_group event for each group exited
-        foreach ($existingGIDArray as $gID) {
-            $group = Group::getByID($gID);
-            if ($group) {
-                $ue = new \Concrete\Core\User\Event\UserGroup($this->getUserObject());
-                $ue->setGroupObject($group);
-                Events::dispatch('on_user_exit_group', $ue);
-            }
-        }
-
-        // Remove from db
-        if (count($existingGIDArray) > 0) {
-            $inStr = implode(',', $existingGIDArray);
-            $q2 = "delete from UserGroups where uID = '{$this->uID}' and gID in ({$inStr})";
-            $r2 = $db->query($q2);
-            // fire the user group removal event for each of the groups we've deleted
-            foreach ($existingGIDArray as $gID) {
-                $ue = new \Concrete\Core\User\Event\UserGroup($this->getUserObject());
-                $ue->setGroupObject(Group::getByID($gID));
-                Events::dispatch('on_user_exit_group', $ue);
-            }
-
-        }
-    }
-
-    public function saveUserAttributesForm($attributes)
-    {
-        foreach($attributes as $uak) {
-            $uak->saveAttributeForm($this);
-        }
-
-        $ue = new \Concrete\Core\User\Event\UserInfoWithAttributes($this);
-        $ue->setAttributes($attributes);
-        Events::dispatch('on_user_attributes_saved', $ue);
+        return Core::make('user.registration')->create($data);
     }
 
     /**
-     * @param array $data
-     * @return UserInfo
+     * @deprecated
      */
-    public function register($data)
+    public static function addSuperUser($uPasswordEncrypted, $uEmail)
     {
-        // slightly different than add. this is public facing
-		if (Config::get('concrete.user.registration.validate_email')) {
-			$data['uIsValidated'] = 0;
-		}
-        $ui = UserInfo::add($data);
-
-        return $ui;
-    }
-
-    public function setupValidation()
-    {
-        $db = Loader::db();
-        $hash = $db->GetOne("select uHash from UserValidationHashes where uID = ? order by uDateGenerated desc", array($this->uID));
-        if ($hash) {
-            return $hash;
-        } else {
-            $h = Loader::helper('validation/identifier');
-            $hash = $h->generate('UserValidationHashes', 'uHash');
-            $db->Execute("insert into UserValidationHashes (uID, uHash, uDateGenerated) values (?, ?, ?)", array($this->uID, $hash, time()));
-
-            return $hash;
-        }
-    }
-
-    public function markValidated()
-    {
-        $db = Loader::db();
-        $v = array($this->uID);
-        $db->query("update Users set uIsValidated = 1, uIsFullRecord = 1 where uID = ?", $v);
-        $db->query("update UserValidationHashes set uDateRedeemed = " . time() . " where uID = ?", $v);
-
-        $ue = new \Concrete\Core\User\Event\UserInfo($this);
-        Events::dispatch('on_user_validate', $ue);
-
-        return true;
-    }
-
-    public function changePassword($newPassword)
-    {
-        $db = Loader::db();
-        if ($this->uID) {
-            $dh = Loader::helper('date');
-            $dateTime = $dh->getOverridableNow();
-            $v = array(
-                $this->getUserObject()->getUserPasswordHasher()->HashPassword($newPassword),
-                $dateTime,
-                $this->uID
-            );
-            $q = "update Users set uPassword = ?, uLastPasswordChange = ?  where uID = ?";
-            $r = $db->prepare($q);
-            $res = $db->execute($r, $v);
-
-            $ue = new \Concrete\Core\User\Event\UserInfoWithPassword($this);
-            $ue->setUserPassword($newPassword);
-
-            $currentUser = new User();
-            $session = Core::make('session');
-            if($currentUser->isLoggedIn() && $currentUser->getUserID() == $session->get('uID')) {
-                $session->set('uLastPasswordChange', $dateTime);
-            }
-
-            Events::dispatch('on_user_change_password', $ue);
-
-            return $res;
-        }
-    }
-
-    public function activate()
-    {
-        $db = Loader::db();
-        $q = "update Users set uIsActive = 1 where uID = '{$this->uID}'";
-        $r = $db->query($q);
-        $ue = new \Concrete\Core\User\Event\UserInfo($this);
-        Events::dispatch('on_user_activate', $ue);
-    }
-
-    public function deactivate()
-    {
-        $db = Loader::db();
-        $q = "update Users set uIsActive = 0 where uID = '{$this->uID}'";
-        $r = $db->query($q);
-        $ue = new \Concrete\Core\User\Event\UserInfo($this);
-        Events::dispatch('on_user_deactivate', $ue);
-    }
-
-    public function resetUserPassword()
-    {
-        // resets user's password, and returns the value of the reset password
-        $db = Loader::db();
-        if ($this->uID > 0) {
-            $newPassword = '';
-            $chars = "abcdefghijklmnpqrstuvwxyzABCDEFGHIJKLMNPQRSTUVWXYZ123456789";
-            for ($i = 0; $i < 7; $i++) {
-                $newPassword .= substr($chars, rand() %strlen($chars), 1);
-            }
-            $this->changePassword($newPassword);
-
-            return $newPassword;
-        }
-    }
-
-    public function hasAvatar()
-    {
-        return $this->uHasAvatar;
-    }
-
-    public function getLastLogin()
-    {
-        return $this->uLastLogin;
-    }
-
-    public function getLastIPAddress()
-    {
-        $ip = new \Concrete\Core\Utility\IPAddress($this->uLastIP, true);
-        return $ip->getIp($ip::FORMAT_IP_STRING);
-    }
-
-    public function getPreviousLogin()
-    {
-        return $this->uPreviousLogin;
-    }
-
-    public function isActive()
-    {
-        return $this->uIsActive;
-    }
-
-    public function isValidated()
-    {
-        return $this->uIsValidated;
-    }
-
-    public function isFullRecord()
-    {
-        return $this->uIsFullRecord;
-    }
-
-    public function getNumLogins()
-    {
-        return $this->uNumLogins;
-    }
-
-    public function getUserID()
-    {
-        return $this->uID;
-    }
-
-    public function getUserName()
-    {
-        return $this->uName;
-    }
-
-    public function getUserDisplayName()
-    {
-        return $this->getUserName();
-    }
-
-    public function getUserPassword()
-    {
-        return $this->uPassword;
-    }
-
-    public function getUserEmail()
-    {
-        return $this->uEmail;
+        return Core::make('user.registration')->createSuperUser($uPasswordEncrypted, $uEmail);
     }
 
     /**
-     * returns the user's timezone
-     * @return string timezone
+     * @deprecated
      */
-    public function getUserTimezone()
+    public static function register($data)
     {
-        return $this->uTimezone;
-    }
-
-    public function getUserDefaultLanguage()
-    {
-        return $this->uDefaultLanguage;
+        return Core::make('user.registration')->createFromPublicRegistration($data);
     }
 
     /**
-     * Gets the date a user was added to the system,
-     * @return string date formated like: 2009-01-01 00:00:00
+     * @deprecated
      */
-    public function getUserDateAdded()
+    public static function getByID($uID)
     {
-        return $this->uDateAdded;
-    }
-
-    public function getUserStartDate()
-    {
-        return $this->upStartDate;
+        return Core::make('Concrete\Core\User\UserInfoFactory')->getByID($uID);
     }
 
     /**
-     * Gets the date a user was last active on the site
-     * @return string date formated like: 2009-01-01 00:00:00
+     * @deprecated
      */
-    public function getLastOnline()
+    public static function getByUserName($uName)
     {
-        return $this->uLastOnline;
+        return Core::make('Concrete\Core\User\UserInfoFactory')->getByName($uName);
     }
 
-    public function getUserEndDate()
+    /**
+     * @deprecated
+     */
+    public static function getByEmail($uEmail)
     {
-        return $this->upEndDate;
+        return Core::make('Concrete\Core\User\UserInfoFactory')->getByEmail($uEmail);
+    }
+
+    /**
+     * @deprecated
+     */
+    public static function getByValidationHash($uHash, $unredeemedHashesOnly = true)
+    {
+        return Core::make('Concrete\Core\User\UserInfoFactory')->getByValidationHash($uHash, $unredeemedHashesOnly);
     }
 
 }

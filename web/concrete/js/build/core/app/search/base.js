@@ -143,6 +143,7 @@
 	ConcreteAjaxSearch.prototype.updateResults = function(result) {
 		var cs = this,
 			options = cs.options;
+
 		cs.$resultsTableHead.html(cs._templateSearchResultsTableHead({'columns': result.columns}));
 		cs.$resultsTableBody.html(cs._templateSearchResultsTableBody({'items': result.items}));
 		cs.$resultsPagination.html(cs._templateSearchResultsPagination({'paginationTemplate': result.paginationTemplate}));
@@ -170,6 +171,12 @@
 			var field = $(this).find(':selected').attr('data-search-field-url');
 			if (field) {
 				cs.ajaxUpdate(field, false, function(r) {
+					_.each(r.assets.css, function(css) {
+						ccm_addHeaderItem(css, 'CSS');
+					});
+					_.each(r.assets.javascript, function(javascript) {
+						ccm_addHeaderItem(javascript, 'JAVASCRIPT');
+					});
 					$content.html(r.html);
 				});
 			}
@@ -260,6 +267,7 @@
 				items = [];
 
 			cs.handleSelectedBulkAction(value, type, $option, cs.$element.find('input[data-search-checkbox=individual]:checked'));
+			cs.$element.find('option').eq(0).prop('selected', true);
 		});
 	}
 

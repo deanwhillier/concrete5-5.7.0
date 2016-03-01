@@ -60,6 +60,7 @@
 				ajaxOptions: {
 					dataType: 'json'
 				},
+				mode: $field.data('editablemode'),
 				emptytext: ccmi18n.none,
 				showbuttons: true,
 				savenochange: true,
@@ -122,7 +123,10 @@
 		updateImageField: function(r, $field) {
 			var my = this;
         	if (ConcreteAjaxRequest.validateResponse(r)) {
-	        	$field.find('.editable-image-display').html(r.imageHTML);
+	        	$field.find('.editable-image-display').html(r.imageHTML)
+	        		.find('img').attr('src', function(index, attr) {
+	        			return attr + '?' + new Date().getTime();
+	        		});
 	        	my.setupImageField($field);
 				ConcreteAlert.notify({
 				'message': r.message
@@ -150,14 +154,14 @@
 				data.task = 'clear';
 
 				var url = my.getAjaxURL($field);
-				return new ConcreteAjaxRequest({
+				new ConcreteAjaxRequest({
 					url: url,
 					data: data,
 					success: function(r) {
 						my[method](r, $field);
 
 					}
-				})
+				});
 				return false;
 			});
 			my.$element.on('click', '[data-editable-field-command=clear_attribute]', function() {
@@ -176,13 +180,13 @@
 
 				ajaxData.push({'name': 'akID', 'value': akID});
 
-				return new ConcreteAjaxRequest({
+				new ConcreteAjaxRequest({
 					url: url,
 					data: ajaxData,
 					success: function(r) {
      					$('[data-key-id=' + akID + '][data-editable-field-type=xeditableAttribute]').editable('setValue', '');
 					}
-				})
+				});
 				return false;
 			});
 		}

@@ -1,11 +1,12 @@
 <?php
+
 namespace Concrete\Core\Sharing\SocialNetwork;
 
 class ServiceList
 {
     protected static function getServices()
     {
-        return array(
+        $services = array(
             array('facebook', 'Facebook', 'facebook'),
             array('twitter', 'Twitter', 'twitter'),
             array('instagram', 'Instagram', 'instagram'),
@@ -24,21 +25,25 @@ class ServiceList
             array('vine', 'Vine', 'vine'),
             array('stumbleupon', 'Stumbleupon', 'stumbleupon'),
             array('skype', 'Skype', 'skype'),
-            array('personal_website', 'Personal Website', 'external-link')
+            array('personal_website', 'Personal Website', 'external-link'),
         );
+
+        if ($additionalSocialNetworks = \Config::get('concrete.social.additional_services')) {
+            $services = array_merge($services, $additionalSocialNetworks);
+        }
+
+        return $services;
     }
 
     public static function get()
     {
         $services = static::getServices();
         $return = array();
-        foreach($services as $serviceArray)
-        {
-            $o = new Service($serviceArray[0], $serviceArray[1], $serviceArray[2]);
+        foreach ($services as $serviceArray) {
+            $o = new Service($serviceArray[0], $serviceArray[1], $serviceArray[2], isset($serviceArray[3]) ? $serviceArray[3] : null);
             $return[] = $o;
         }
+
         return $return;
     }
-
-
 }

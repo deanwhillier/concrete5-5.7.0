@@ -1,6 +1,6 @@
 <? defined('C5_EXECUTE') or die("Access Denied."); ?>  
 
-<div id="ccm-block-html-value"><?=h($content)?></div>
+<div id="ccm-block-html-value"><?=htmlspecialchars($content,ENT_QUOTES,APP_CHARSET)?></div>
 <textarea style="display: none" id="ccm-block-html-value-textarea" name="content"></textarea>
 
 <style type="text/css">
@@ -16,8 +16,13 @@
         var editor = ace.edit("ccm-block-html-value");
         editor.setTheme("ace/theme/eclipse");
         editor.getSession().setMode("ace/mode/html");
+        refreshTextarea(editor.getValue());
         editor.getSession().on('change', function() {
-            $('#ccm-block-html-value-textarea').val(editor.getValue());
+            refreshTextarea(editor.getValue());
         });
     });
+
+    function refreshTextarea(contents) {
+      $('#ccm-block-html-value-textarea').val(contents);
+    }
 </script>

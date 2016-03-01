@@ -17,12 +17,28 @@ $customClasses = array();
 if (isset($blockClasses[$b->getBlockTypeHandle()])) {
     $customClasses = $blockClasses[$b->getBlockTypeHandle()];
 }
+
+if(isset($blockClasses['*'])) {
+    $customClasses = array_unique(array_merge($customClasses, $blockClasses['*']));
+}
+
+$enableBlockContainer = -1;
+if ($pt->supportsGridFramework() && $b->overrideBlockTypeContainerSettings()) {
+    $enableBlockContainer = $b->enableBlockContainer();
+}
+
+$gf = $pt->getThemeGridFrameworkObject();
+
+
 Loader::element("custom_style", array(
     'saveAction' => $controller->action('submit'),
     'resetAction' => $controller->action('reset'),
     'style' => $b->getCustomStyle(true),
-    'bFilename' => $b->getBlockFilename(),
+    'bFilename' => $bFilename,
     'bName' => $b->getBlockName(),
+    'displayBlockContainerSettings' => $pt->supportsGridFramework(),
+    'enableBlockContainer' => $enableBlockContainer,
+    'gf' => $gf,
     'templates' => $templates,
     'customClasses' => $customClasses,
     'canEditCustomTemplate' => $canEditCustomTemplate,

@@ -1,12 +1,16 @@
-<?php 
+<?php
 namespace Concrete\Core\Page\Theme\GridFramework\Type;
 
 use Concrete\Core\Page\Theme\GridFramework\GridFramework;
 
-defined('C5_EXECUTE') or die(_("Access Denied."));
+defined('C5_EXECUTE') or die('Access Denied.');
 
 class Foundation extends GridFramework
 {
+    public function supportsNesting()
+    {
+        return true;
+    }
 
     public function getPageThemeGridFrameworkName()
     {
@@ -49,6 +53,7 @@ class Foundation extends GridFramework
             'medium-11',
             'medium-12',
         );
+
         return $columns;
     }
 
@@ -68,6 +73,7 @@ class Foundation extends GridFramework
             'medium-offset-11',
             'medium-offset-12',
         );
+
         return $offsets;
     }
 
@@ -80,5 +86,4 @@ class Foundation extends GridFramework
     {
         return 'columns';
     }
-
 }

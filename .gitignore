@@ -42,6 +42,7 @@ error_log
 .project
 
 # ignore Eclipse-specific files
+/.externalToolBuilders/
 /.settings/
 /.buildpath
 
@@ -62,6 +63,7 @@ __IDE_SYMBOLS__.php
 
 # Built assets
 # JS
+/web/concrete/js/frontend
 /web/concrete/js/account.js
 /web/concrete/js/app.js
 /web/concrete/js/backstretch.js
@@ -80,8 +82,12 @@ __IDE_SYMBOLS__.php
 /web/concrete/js/file-manager.js
 /web/concrete/js/gathering.js
 /web/concrete/js/groups.js
+/web/concrete/js/frontend/parallax-image.js
+/web/concrete/js/help.js
+/web/concrete/js/backbone.js
 /web/concrete/js/image-editor.js
 /web/concrete/js/jquery-cookie.js
+/web/concrete/js/jquery-tristate.js
 /web/concrete/js/jquery-fileupload.js
 /web/concrete/js/jquery-form.js
 /web/concrete/js/jquery-magnific-popup.js
@@ -95,8 +101,9 @@ __IDE_SYMBOLS__.php
 /web/concrete/js/topics.js
 /web/concrete/js/underscore.js
 /web/concrete/js/lightbox.js
-/web/concrete/js/legacy.js
 /web/concrete/js/select2.js
+/web/concrete/js/translator.js
+/web/concrete/js/textcounter.js
 
 # CSS
 /web/concrete/css/select2.css
@@ -112,8 +119,10 @@ __IDE_SYMBOLS__.php
 /web/concrete/css/gathering/display.css
 /web/concrete/css/image-editor.css
 /web/concrete/css/jquery-magnific-popup.css
+/web/concrete/css/help.css
 /web/concrete/css/jquery-awesome-rating.css
 /web/concrete/css/jquery-ui.css
+/web/concrete/css/dropzone.css
 /web/concrete/css/redactor.css
 /web/concrete/css/sitemap.css
 /web/concrete/css/spectrum.css
@@ -123,4 +132,4 @@ __IDE_SYMBOLS__.php
 /web/concrete/themes/concrete/main.css
 /web/concrete/themes/dashboard/main.css
 /web/concrete/themes/elemental/css/bootstrap-modified.css
-/web/concrete/css/legacy.css
+/web/concrete/css/translator.css

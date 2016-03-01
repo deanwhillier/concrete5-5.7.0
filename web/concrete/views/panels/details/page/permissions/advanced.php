@@ -7,7 +7,7 @@ defined('C5_EXECUTE') or die("Access Denied.");
 	<?
 	  $cpc = $c->getPermissionsCollectionObject();
 	if ($c->getCollectionInheritance() == "PARENT") { ?>
-		<div class="alert alert-info"><?=t('This page inherits its permissions from:');?> <a target="_blank" href="<?=DIR_REL?>/<?=DISPATCHER_FILENAME?>?cID=<?=$cpc->getCollectionID()?>"><?=$cpc->getCollectionName()?></a></div>
+		<div class="alert alert-info"><?=t('This page inherits its permissions from:');?> <a target="_blank" href="<?=URL::to($cpc)?>"><?=$cpc->getCollectionName()?></a></div>
 	<? } ?>		
 
 
@@ -148,7 +148,8 @@ ccm_refreshPagePermissions = function() {
     if (panel) {
         panel.openPanelDetail({
             'identifier': 'page-permissions',
-            'url': '<?=URL::to("/ccm/system/panels/details/page/permissions")?>'
+            'url': '<?=URL::to("/ccm/system/panels/details/page/permissions")?>',
+            target: null
         });
     } else {
 		jQuery.fn.dialog.showLoader();

@@ -62,25 +62,14 @@ class Composer extends BackendInterfacePageController {
 
 			$c = $this->page;
 			$e = $ptr->error;
-			if (!$c->getPageDraftTargetParentPageID()) {
-				$e->add(t('You must choose a page to publish this page beneath.'));
+			$validator = $pagetype->getPageTypeValidatorObject();
+			if ($this->page->isPageDraft()) {
+				$target = \Page::getByID($this->page->getPageDraftTargetParentPageID());
 			} else {
-				$target = \Page::getByID($c->getPageDraftTargetParentPageID());
-				$ppc = new \Permissions($target);
-				$pagetype = $c->getPageTypeObject();
-				if (!$ppc->canAddSubCollection($pagetype)) {
-					$e->add(t('You do not have permission to publish a page in this location.'));
-				}
+				$target = \Page::getByID($this->page->getCollectionParentID());
 			}
-
-			foreach($outputControls as $oc) {
-				if ($oc->isPageTypeComposerFormControlRequiredOnThisRequest()) {
-					$r = $oc->validate();
-					if ($r instanceof \Concrete\Core\Error\Error) {
-						$e->add($r);
-					}
-				}
-			}
+			$e->add($validator->validatePublishLocationRequest($target));
+			$e->add($validator->validatePublishDraftRequest($c));
 
 			$ptr->setError($e);
 
@@ -126,7 +115,8 @@ class Composer extends BackendInterfacePageController {
 		if (!is_object($pt)) {
 			$pt = $pagetype->getPageTypeDefaultPageTemplateObject();
 		}
-		$e = $pagetype->validateCreateDraftRequest($pt);
+		$validator = $pagetype->getPageTypeValidatorObject();
+		$e = $validator->validateCreateDraftRequest($pt);
         $outputControls = array();
 		if (!$e->has()) {
 			$c = $c->getVersionToModify();

@@ -1,6 +1,7 @@
 <?php
 namespace Concrete\Core\Page\Type\Composer\Control;
 
+use Concrete\Core\Package\PackageList;
 use Loader;
 use \Concrete\Core\Foundation\Object;
 use Controller;
@@ -50,16 +51,17 @@ class BlockControl extends Control
         $b->deleteBlock();
     }
 
-    protected function getPageTypeComposerControlBlockObject(Page $c)
+    public function getPageTypeComposerControlBlockObject(Page $c)
     {
         $db = Loader::db();
         if (!is_object($this->b)) {
             $setControl = $this->getPageTypeComposerFormLayoutSetControlObject();
             $r = $db->GetRow(
-                'select bID, arHandle from PageTypeComposerOutputBlocks where cID = ? and ptComposerFormLayoutSetControlID = ?',
+                $q = 'select cdb.bID, cdb.arHandle from PageTypeComposerOutputBlocks cdb inner join CollectionVersionBlocks cvb on (cdb.bID = cvb.bID and cvb.cID = cdb.cID and cvb.cvID = ?) where cdb.ptComposerFormLayoutSetControlID = ? and cdb.cID = ?',
                 array(
-                    $c->getCollectionID(),
-                    $setControl->getPageTypeComposerFormLayoutSetControlID()
+                    $c->getVersionID(),
+                    $setControl->getPageTypeComposerFormLayoutSetControlID(),
+                    $c->getCollectionID()
                 )
             );
             if (!$r['bID']) {
@@ -214,6 +216,18 @@ class BlockControl extends Control
             );
             if ($rec->exists()) {
                 $template = DIRNAME_BLOCK_TEMPLATES_COMPOSER . '/' . $customTemplate;
+            } else {
+                foreach (PackageList::get()->getPackages() as $pkg) {
+                    $file =
+                        (is_dir(DIR_PACKAGES . '/' . $pkg->getPackageHandle()) ? DIR_PACKAGES : DIR_PACKAGES_CORE)
+                        . '/' . $pkg->getPackageHandle() . '/' . DIRNAME_BLOCKS . '/' . $obj->getBlockTypeHandle() . '/' . DIRNAME_BLOCK_TEMPLATES_COMPOSER . '/' .
+                        $customTemplate;
+                    if (file_exists($file)) {
+                        $template = DIRNAME_BLOCK_TEMPLATES_COMPOSER . '/' . $customTemplate;
+                        break;
+                    }
+
+                }
             }
         }
 
@@ -221,7 +235,30 @@ class BlockControl extends Control
             $template = FILENAME_BLOCK_COMPOSER;
         }
 
-        $this->inc($template, array('view' => $this, 'control' => $this, 'obj' => $obj, 'description' => $description));
+        $this->inc($template, array('control' => $this, 'obj' => $obj, 'description' => $description));
+    }
+
+    public function action($task)
+    {
+        $obj = $this->getPageTypeComposerControlDraftValue();
+        if (!is_object($obj)) {
+            // we don't have a page, an area, or ANYTHING YET.
+            $arguments = array('/ccm/system/block/action/add_composer',
+                $this->getPageTypeComposerFormLayoutSetControlObject()->getPageTypeComposerFormLayoutSetControlID(),
+                $task
+            );
+            return call_user_func_array(array('\URL', 'to'), $arguments);
+        } else {
+            $area = $obj->getBlockAreaObject();
+            $c = $area->getAreaCollectionObject();
+            $arguments = array('/ccm/system/block/action/edit_composer',
+                $c->getCollectionID(),
+                urlencode($area->getAreaHandle()),
+                $this->getPageTypeComposerFormLayoutSetControlObject()->getPageTypeComposerFormLayoutSetControlID(),
+                $task
+            );
+            return call_user_func_array(array('\URL', 'to'), $arguments);
+        }
     }
 
     public function inc($file, $args = array())
@@ -247,8 +284,24 @@ class BlockControl extends Control
             $pkg = Package::getByID($obj->getPackageID());
         }
 
-        $path = $env->getPath(DIRNAME_BLOCKS . '/' . $obj->getBlockTypeHandle() . '/' . $file, $pkg);
-        include($path);
+        $view = $this;
+
+        $r = $env->getRecord(DIRNAME_BLOCKS . '/' . $obj->getBlockTypeHandle() . '/' . $file, $pkg);
+        if ($r->exists()) {
+            include $r->file;
+        } else {
+            foreach (PackageList::get()->getPackages() as $pkg) {
+                $include =
+                    (is_dir(DIR_PACKAGES . '/' . $pkg->getPackageHandle()) ? DIR_PACKAGES : DIR_PACKAGES_CORE)
+                    . '/' . $pkg->getPackageHandle() . '/' . DIRNAME_BLOCKS . '/' . $obj->getBlockTypeHandle() . '/' .
+                    $file;
+                if (file_exists($include)) {
+                    include $include;
+                }
+
+            }
+
+        }
     }
 
     public function getPageTypeComposerControlDraftValue()
@@ -286,6 +339,7 @@ class BlockControl extends Control
         $arHandle = $b->getAreaHandle();
         $blockDisplayOrder = $b->getBlockDisplayOrder();
         $bFilename = $b->getBlockFilename();
+        $defaultStyles = $b->getCustomStyle();
         $b->deleteBlock();
         $ax = Area::getOrCreate($c, $arHandle);
         $b = $c->addBlock($bt, $ax, $data);
@@ -295,16 +349,26 @@ class BlockControl extends Control
             $b->setCustomTemplate($bFilename);
         }
 
+        if ($defaultStyles) {
+            $b->setCustomStyleSet($defaultStyles->getStyleSet());
+        }
+
         // make a reference to the new block
+        $this->recordPageTypeComposerOutputBlock($b);
+    }
+
+    public function recordPageTypeComposerOutputBlock(\Concrete\Core\Block\Block $block)
+    {
         $db = Loader::db();
+        $setControl = $this->getPageTypeComposerFormLayoutSetControlObject();
         $db->Execute(
             'insert into PageTypeComposerOutputBlocks (cID, arHandle, ptComposerFormLayoutSetControlID, cbDisplayOrder, bID) values (?, ?, ?, ?, ?)',
             array(
-                $c->getCollectionID(),
-                $arHandle,
+                $block->getBlockCollectionID(),
+                $block->getAreaHandle(),
                 $setControl->getPageTypeComposerFormLayoutSetControlID(),
-                $b->getBlockDisplayOrder(),
-                $b->getBlockID()
+                $block->getBlockDisplayOrder(),
+                $block->getBlockID()
             )
         );
     }

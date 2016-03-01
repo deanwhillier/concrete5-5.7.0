@@ -129,7 +129,7 @@ function id($mixed)
 }
 
 /**
- *  Returns a concrete5 namespaced class
+ *  Returns a concrete5 namespaced class. $prefix is either true (for application), or a package handle or null.
  *
  * @param string $class
  * @param bool   $prefix
@@ -140,8 +140,22 @@ function core_class($class, $prefix = false)
     $class = trim($class, '\\');
     if ($prefix) {
         if (substr($class, 0, 5) == "Core\\") {
-            $class = "Src\\" . substr($class, 5);
+            if ($prefix !== true) {
+                $x = \Package::getClass($prefix);
+                if ($x->providesCoreExtensionAutoloaderMapping()) {
+                    $class = substr($class, 5);
+                } else {
+                    $class = "Src\\" . substr($class, 5);
+                }
+            } else {
+                if (Config::get('app.provide_core_extension_autoloader_mapping')) {
+                    $class = substr($class, 5);
+                } else {
+                    $class = "Src\\" . substr($class, 5);
+                }
+            }
         }
+
         if ($prefix === true) {
             $prefix = Config::get('app.namespace');
         } else {
@@ -239,4 +253,14 @@ function array_to_object($o, $array)
     }
 
     return $o;
+}
+
+/**
+ * Dumps information about a variable in a way that can be used with Doctrine recursive objects.)
+ * @param $o
+ * @param bool $maxDepth
+ */
+function var_dump_safe($o, $maxDepth = true)
+{
+    return Doctrine\Common\Util\Debug::dump($o, $maxDepth);
 }

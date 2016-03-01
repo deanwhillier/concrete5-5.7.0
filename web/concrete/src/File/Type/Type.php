@@ -101,9 +101,8 @@ class Type
 
     public function getCustomInspector()
     {
-        $class = '\\Concrete\\Core\\File\\Type\\Inspector\\' . Loader::helper('text')->camelcase(
-                $this->getCustomImporter()
-            ) . 'Inspector';
+        $name = camelcase($this->getCustomImporter()) . 'Inspector';
+        $class = overrideable_core_class('Core\\File\\Type\\Inspector\\' . $name, 'File/Type/Inspector/' . $name . '.php', $this->getPackageHandle());
         $cl = Core::make($class);
         return $cl;
     }
@@ -130,18 +129,32 @@ class Type
         return $types;
     }
 
+    public static function getTypeList()
+    {
+        return array(
+            static::T_DOCUMENT,
+            static::T_IMAGE,
+            static::T_VIDEO,
+            static::T_AUDIO,
+            static::T_TEXT,
+            static::T_APPLICATION,
+            static::T_UNKNOWN
+        );
+    }
+
     /**
      * Returns a thumbnail for this type of file
      */
     public function getThumbnail($fullImageTag = true)
     {
+        $type = \Concrete\Core\File\Image\Thumbnail\Type\Type::getByHandle(\Config::get('concrete.icons.file_manager_listing.handle'));
         if (file_exists(DIR_AL_ICONS . '/' . $this->extension . '.png')) {
             $url = REL_DIR_AL_ICONS . '/' . $this->extension . '.png';
         } else {
             $url = AL_ICON_DEFAULT;
         }
         if ($fullImageTag == true) {
-            return '<img src="' . $url . '" class="img-responsive ccm-generic-thumbnail" />';
+            return sprintf('<img src="%s" width="%s" height="%s" class="img-responsive ccm-generic-thumbnail">', $url, $type->getWidth(), $type->getHeight());
         } else {
             return $url;
         }

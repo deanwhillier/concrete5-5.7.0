@@ -8,7 +8,6 @@ class ApplicationServiceProvider extends ServiceProvider {
 		$singletons = array(
 			'helper/concrete/asset_library' => '\Concrete\Core\Application\Service\FileManager',
 			'helper/concrete/file_manager' => '\Concrete\Core\Application\Service\FileManager',
-			'helper/concrete/avatar' => '\Concrete\Core\Application\Service\Avatar',
 			'helper/concrete/composer' => '\Concrete\Core\Application\Service\Composer',
 			'helper/concrete/dashboard' => '\Concrete\Core\Application\Service\Dashboard',
 			'helper/concrete/dashboard/sitemap' => '\Concrete\Core\Application\Service\Dashboard\Sitemap',
@@ -21,14 +20,24 @@ class ApplicationServiceProvider extends ServiceProvider {
 			'helper/concrete/validation' => '\Concrete\Core\Application\Service\Validation',
 			'helper/rating' => '\Concrete\Attribute\Rating\Service',
             'helper/pagination' => '\Concrete\Core\Legacy\Pagination',
+
+			'help' => '\Concrete\Core\Application\Service\UserInterface\Help',
+			'help/core' => '\Concrete\Core\Application\Service\UserInterface\Help\CoreManager',
+			'help/dashboard' => '\Concrete\Core\Application\Service\UserInterface\Help\DashboardManager',
+			'help/block_type' => '\Concrete\Core\Application\Service\UserInterface\Help\BlockTypeManager',
+			'help/panel' => '\Concrete\Core\Application\Service\UserInterface\Help\PanelManager'
 		);
 
 		foreach($singletons as $key => $value) {
 			$this->app->singleton($key, $value);
 		}
 
-        $this->app->bind('controller/page/default', 'Concrete\Core\Page\Controller\PageController');
         $this->app->bind('error', 'Concrete\Core\Error\Error');
+
+		/**
+		 * @deprecated
+		 */
+		$this->app->singleton('helper/concrete/avatar', '\Concrete\Core\Legacy\Avatar');
 	}
 
 }

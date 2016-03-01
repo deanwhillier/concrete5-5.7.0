@@ -7,7 +7,6 @@ if ($controller->getTask() == 'add') {
 	$paginate = 1;
 	$itemsPerPage = 50;
 	$displayMode = 'threaded';
-	$insertNewMessages = 'top';
 	$enableOrdering = 1;
 	$enableCommentRating = 1;
 	$displayPostingForm = 'top';
@@ -28,8 +27,8 @@ if ($controller->getTask() == 'add') {
     $maxFilesRegistered = Config::get('conversations.files.registered.max');
     $fileExtensions = implode(',', $fileAccessFileTypes);
     $attachmentsEnabled = intval(Config::get('conversations.attachments_enabled'));
-	$notification = (bool) Config::get('conversations.notification');
-	$notificationEmail = Config::get('conversations.notification_email');
+	$notificationUsers = Conversation::getDefaultSubscribedUsers();
+	$subscriptionEnabled = intval(Config::get('conversations.subscription_enabled'));
 }
 
 if(!$dateFormat) {
@@ -93,20 +92,6 @@ if(!$dateFormat) {
 	<div class="form-group" data-row="itemsPerPage">
 		<label class="control-label"><?=t('Messages Per Page')?></label>
 		<?=$form->text('itemsPerPage', $itemsPerPage, array('class' => 'span1'))?>
-	</div>
-	<div class="form-group">
-		<label class="control-label"><?=t('Add New Messages')?></label>
-		<div class="radio">
-			<label>
-			<?=$form->radio('insertNewMessages', 'top', $insertNewMessages)?>
-			<?=t('Top')?></label>
-		</div>
-		<div class="radio">
-			<label>
-			<?=$form->radio('insertNewMessages', 'bottom', $insertNewMessages)?>
-			<?=t('Bottom')?>
-		</label>
-		</div>
 	</div>
 </fieldset>
 
@@ -233,15 +218,18 @@ if(!$dateFormat) {
 		</div>
 	</div>
 	<div class="form-group notification-overrides">
-		<div class="checkbox">
-			<label class="control-label">
-				<?=$form->checkbox('notification', 1, $notification)?> <?=t('Send an email when a message is posted.')?>
-			</label>
+		<div class="form-group">
+			<label class="control-label"><?=t('Users To Receive Conversation Notifications')?></label>
+			<?=Core::make("helper/form/user_selector")->selectMultipleUsers('notificationUsers', $notificationUsers)?>
 		</div>
 	</div>
 	<div class="form-group notification-overrides">
-		<label class="control-label"><?=t('Email Address')?></label>
-		<?=$form->text('notificationEmail', $notification > 0 ? $notificationEmail : '')?>
+		<label class="control-label"><?=t('Subscribe Option')?></label>
+		<div class="checkbox">
+			<label><?=$form->checkbox('subscriptionEnabled', 1, $subscriptionEnabled)?>
+				<?=t('Yes, allow registered users to choose to subscribe to conversations.')?>
+			</label>
+		</div>
 	</div>
 </fieldset>
 
@@ -268,11 +256,9 @@ $(function() {
 	$('input[name=notificationOverridesEnabled]').on('change', function() {
 		var ao = $('input[name=notificationOverridesEnabled]:checked');
 		if (ao.val() == 1) {
-			$('.notification-overrides input').prop('disabled', false);
-			$('.notification-overrides label').removeClass('text-muted');
+			$('.notification-overrides').show();
 		} else {
-			$('.notification-overrides input').prop('disabled', true);
-			$('.notification-overrides label').addClass('text-muted');
+			$('.notification-overrides').hide();
 		}
 	}).trigger('change');
 });

@@ -24,17 +24,38 @@ if ($controller->getTask() == 'view_details') {
             $pk = PermissionKey::getByHandle('approve_page_versions');
             $pk->setPermissionObject($stack);
             $pa = $pk->getPermissionAccessObject();
-            if (is_object($pa) && count($pa->getWorkflows()) > 0) {
+
+            $workflows = array();
+            $canApproveWorkflow = true;
+            if (is_object($pa)) {
+                $workflows = $pa->getWorkflows();
+            }
+            foreach($workflows as $wf) {
+                if (!$wf->canApproveWorkflow()) {
+                    $canApproveWorkflow = false;
+                }
+            }
+
+    		if (count($workflows > 0) && !$canApproveWorkflow) {
                 $publishTitle = t('Submit to Workflow');
             }
             $showApprovalButton = true;
         }
     }
 
+    $isGlobalArea = false;
+    if ($stack->getStackType() == Stack::ST_TYPE_GLOBAL_AREA) {
+        $isGlobalArea = true;
+    }
+
     ?>
 
     <div class="ccm-dashboard-header-buttons">
+        <?php if ($isGlobalArea) { ?>
+        <a href="<?=URL::to('/dashboard/blocks/stacks/view_global_areas')?>" data-dialog="add-stack" class="btn btn-default"><i class="fa fa-angle-double-left"></i> <?=t("Back to Global Areas")?></a>
+        <?php } else { ?>
         <a href="<?=URL::to('/dashboard/blocks/stacks')?>" data-dialog="add-stack" class="btn btn-default"><i class="fa fa-angle-double-left"></i> <?=t("Back to Stacks")?></a>
+        <?php } ?>
     </div>
 
     <p class="lead"><?php echo $stack->getCollectionName()?></p>
@@ -117,10 +138,11 @@ if ($controller->getTask() == 'view_details') {
     <script type="text/javascript">
         var showApprovalButton = function() {
             $('#ccm-stack-list-approve-button').show().addClass("animated fadeIn");
-        }
+        };
 
         $(function() {
-            var editor = new Concrete.EditMode({notify: false});
+            var editor = new Concrete.EditMode({notify: false}), ConcreteEvent = Concrete.event;
+
 
             ConcreteEvent.on('ClipboardAddBlock', function(event, data) {
                 var area = editor.getAreaByID(<?=$a->getAreaID()?>);
@@ -138,18 +160,29 @@ if ($controller->getTask() == 'view_details') {
 
             ConcreteEvent.on('EditModeAddClipboardComplete', function(event, data) {
                 showApprovalButton();
+                Concrete.getEditMode().scanBlocks();
             });
 
             ConcreteEvent.on('EditModeAddBlockComplete', function(event, data) {
                 showApprovalButton();
+                Concrete.getEditMode().scanBlocks();
             });
 
             ConcreteEvent.on('EditModeUpdateBlockComplete', function(event, data) {
                 showApprovalButton();
+                Concrete.getEditMode().scanBlocks();
             });
 
             ConcreteEvent.on('EditModeBlockDelete', function(event, data) {
                 showApprovalButton();
+                _.defer(function() {
+                    Concrete.getEditMode().scanBlocks();
+                });
+            });
+
+            ConcreteEvent.on('EditModeBlockMove', function(event, data) {
+                showApprovalButton();
+                Concrete.getEditMode().scanBlocks();
             });
 
             $('a[data-dialog=delete-stack]').on('click', function() {
@@ -233,6 +266,22 @@ if ($controller->getTask() == 'view_details') {
 
 
     <div class="ccm-dashboard-header-buttons">
+        <? if (\Core::make('multilingual/detector')->isEnabled() && $defaultLanguage) {
+            $ch = Core::make('multilingual/interface/flag');
+            ?>
+        <span class="dropdown">
+        <button type="button" class="btn btn-default" data-toggle="dropdown">
+            <?=$ch->getSectionFlagIcon($defaultLanguage)?> <?php echo $defaultLanguage->getLanguageText()?> <span class="text-muted"><?php echo $defaultLanguage->getLocale();?></span>
+            <span class="caret"></span>
+        </button>
+        <ul class="dropdown-menu" role="menu">
+            <? foreach($multilingualSections as $section) { ?>
+                <li><a href="<?=$view->action('set_default_language', $section->getCollectionID(), $controller->getTask())?>"><?=$ch->getSectionFlagIcon($section)?> <?php echo $section->getLanguageText()?> <span class="text-muted"><?php echo $section->getLocale();?></span></a></li>
+            <? } ?>
+        </ul>
+        <? } ?>
+        </span>
+        <span class="dropdown">
         <button type="button" class="btn btn-default" data-toggle="dropdown">
             <? if ($controller->getTask() == 'view_global_areas') { ?>
                 <?=t('View Global Areas')?>
@@ -245,6 +294,7 @@ if ($controller->getTask() == 'view_details') {
             <li><a href="<?=$controller->action('view')?>"><?=t('View Stacks')?></a></li>
             <li><a href="<?=$controller->action('view_global_areas')?>"><?=t('View Global Areas')?></a></li>
         </ul>
+        </span>
         <? if ($controller->getTask() != 'view_global_areas') { ?>
             <a href="javascript:void(0)" data-dialog="add-stack" class="btn btn-primary"><?=t("Add Stack")?></a>
         <? } ?>

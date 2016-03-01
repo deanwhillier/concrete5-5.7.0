@@ -1,4 +1,7 @@
-<? defined('C5_EXECUTE') or die("Access Denied."); ?>
+<?php defined('C5_EXECUTE') or die("Access Denied.");
+
+$token = \Core::make('Concrete\Core\Validation\CSRF\Token');
+?>
 <div class="row">
 <div class="col-sm-10 col-sm-offset-1">
 <div class="page-header">
@@ -39,6 +42,7 @@ if($registerSuccess) { ?>
 <?
 } else { ?>
 	<form method="post" action="<?=$view->url('/register', 'do_register')?>" class="form-stacked">
+		<?php $token->output('register.do_register') ?>
 		<div class="row">
 			<div class="col-sm-10 col-sm-offset-1">
 				<fieldset>
@@ -59,11 +63,11 @@ if($registerSuccess) { ?>
                     </div>
                     <div class="form-group">
 						<?=$form->label('uPassword',t('Password'))?>
-					    <?=$form->password('uPassword')?>
+					    <?=$form->password('uPassword',array('autocomplete' => 'off'))?>
 					</div>
                     <div class="form-group">
 						<?=$form->label('uPasswordConfirm',t('Confirm Password'))?>
-						<?=$form->password('uPasswordConfirm')?>
+						<?=$form->password('uPasswordConfirm',array('autocomplete' => 'off'))?>
 					</div>
 
 				</fieldset>

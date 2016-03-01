@@ -10,6 +10,7 @@ class MetadataGenerator
     {
         $file = '<?php namespace PHPSTORM_META { $STATIC_METHOD_TYPES = array(\\Core::make(\'\') => array(' . PHP_EOL;
 
+        $legacyHelpers = array();
         $bindings = Core::getBindings();
         foreach ($bindings as $name => $binding) {
             /** @var \Closure $binding */
@@ -19,7 +20,10 @@ class MetadataGenerator
             if (!isset($static['concrete'])) {
                 try {
                     $class = Core::make($name);
-                    $className = get_class($class);
+
+                    if (is_object($class)) {
+                        $className = get_class($class);
+                    }
                 } catch (\Exception $e) {}
             } else {
                 $className = $static['concrete'];
@@ -31,8 +35,36 @@ class MetadataGenerator
                 }
 
                 $file .= '\'' . $name . '\' instanceof ' . $className . ',' . PHP_EOL;
+
+                if (substr($name, 0, 7) === 'helper/') {
+                    $legacyHelpers[substr($name, 7)] = $className;
+                }
             }
         }
+
+        $app = Core::make('app');
+        $reflection = new \ReflectionClass($app);
+        $instances = $reflection->getProperty("instances");
+        $instances->setAccessible(true); // :)
+        foreach ($instances->getValue($app) as $name => $instance) {
+            if (!isset($bindings[$name])) {
+                $className = get_class($instance);
+                $file .= '\'' . $name . '\' instanceof ' . $className . ',' . PHP_EOL;
+            }
+        }
+
+        $file .= '), \Loader::helper(\'\') => array(';
+        foreach ($legacyHelpers as $legacyHelper => $className) {
+            $file .= '\'' . $legacyHelper . '\' instanceof ' . $className . ',' . PHP_EOL;
+        }
+
+        $file .= '), \Package::getByHandle(\'\') => array(';
+        $packages = \Package::getAvailablePackages(false);
+        foreach ($packages as $package) {
+            /** @var \Package $package */
+            $file .= '\'' . $package->getPackageHandle() . '\' instanceof \\' . get_class($package) . ',' . PHP_EOL;
+        }
+
         $file .= '));}';
 
         return $file;
